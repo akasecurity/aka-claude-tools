@@ -62,7 +62,7 @@ chk 0 "allow: /var/folders C dir"                  'rm -rf /var/folders/ab/cdef/
 chk 0 "allow: rm in a heredoc body"                $'cat <<EOF\nrm -rf /tmp/*\nEOF'
 chk 0 "allow: unset variable path"                 'rm -rf $mydir'
 chk 0 "allow: find -delete in the working dir"     'find . -name "*.tmp" -delete'
-chk 0 "allow: a worktree path"                     'rm -rf /Users/dev/factory/wt.noindex/x'
+chk 0 "allow: a worktree path"                     'rm -rf /work/trees/x'
 chk 0 "allow: distinctive own prefix"              'rm /tmp/wdcap-*.txt'
 chk 0 "allow: own literal and own prefix"          'rm -rf /tmp/rvrev /tmp/rvrev.*'
 chk 0 "allow: own prefix with extension"           'rm -f /tmp/scratch-r5.tfstate*'
