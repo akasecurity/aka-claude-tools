@@ -224,11 +224,12 @@ function misorderedPkill(cmd: string, platform: string = process.platform): stri
 // prefix (/tmp/wdcap-*.txt) pass. Strings are parsed only, never run.
 interface GlobWord { t: string; g: boolean[] } // the text and, per char, "an unquoted glob char"
 const TEMP_GLOB_CHARS = new Set(['*', '?', '[', '{']);
-const TEMP_PREFIX_WRAPPERS = new Set(['sudo', 'command', 'env', 'nice', 'time', 'nohup', 'exec', 'builtin']);
+// Commands that run the next word; the value is the letters of their options that take a value.
+const TEMP_WRAPPERS: Record<string, string> = { sudo: 'ughpCDRTU', doas: 'Cu', env: 'uSC', nice: 'n', xargs: 'nIiLPsEd', command: '', exec: '', builtin: '', nohup: '', time: '', rtk: '' };
 const baseName = (t: string) => t.slice(t.lastIndexOf('/') + 1);
 
 function globCommands(cmd: string): GlobWord[][] {
-  const s = stripHeredocs(cmd);
+  const s = splitDataHeredocs(cmd).code; // data bodies are text; a body fed to a shell stays
   const cmds: GlobWord[][] = [];
   let cur: GlobWord[] = [];
   let w: GlobWord | null = null;
@@ -250,7 +251,7 @@ function globCommands(cmd: string): GlobWord[][] {
     if (c === '#' && !w) { while (i < s.length && s[i] !== '\n') i++; endCmd(); continue; }
     if (/\s/.test(c)) { if (c === '\n') endCmd(); else endWord(); continue; }
     if (';&|()`'.includes(c)) { endCmd(); continue; }
-    add(c, TEMP_GLOB_CHARS.has(c));
+    add(c, TEMP_GLOB_CHARS.has(c) && !(c === '{' && s[i - 1] === '$')); // ${var} is not a brace glob
   }
   endCmd();
   return cmds;
@@ -307,7 +308,15 @@ function tempRmRefusal(cmd: string): string | null {
   if (!/\b(rm|rmdir|unlink|find)\b/.test(cmd)) return null;
   for (const words of globCommands(cmd)) {
     let i = 0;
-    while (i < words.length && (TEMP_PREFIX_WRAPPERS.has(baseName(words[i].t)) || /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i].t))) i++;
+    for (;;) {
+      if (i < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i].t)) { i++; continue; }
+      const wrap = i < words.length ? TEMP_WRAPPERS[baseName(words[i].t)] : undefined;
+      if (!Object.prototype.hasOwnProperty.call(TEMP_WRAPPERS, baseName(words[i]?.t ?? '')) || wrap === undefined) break;
+      i++;
+      while (i < words.length && words[i].t.startsWith('-') && words[i].t !== '--') {
+        i += words[i].t.length === 2 && wrap.includes(words[i].t[1]) ? 2 : 1;
+      }
+    }
     const name = words[i] ? baseName(words[i].t) : '';
     const args = words.slice(i + 1);
     if (name === 'rm' || name === 'rmdir' || name === 'unlink') {
@@ -326,7 +335,7 @@ function tempRmRefusal(cmd: string): string | null {
       if (del) {
         for (const a of starts) {
           const r = tempPathRefusal(a);
-          if (r && !r.startsWith('a glob selecting')) return `find -delete: ${r} (${a.t})`;
+          if (r) return `find -delete: ${r} (${a.t})`;
         }
       }
     }
