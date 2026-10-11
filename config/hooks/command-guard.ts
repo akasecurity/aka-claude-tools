@@ -316,6 +316,7 @@ function tempRmRefusal(cmd: string): string | null {
       while (i < words.length && words[i].t.startsWith('-') && words[i].t !== '--') {
         i += words[i].t.length === 2 && wrap.includes(words[i].t[1]) ? 2 : 1;
       }
+      if (words[i]?.t === '--') i++;
     }
     const name = words[i] ? baseName(words[i].t) : '';
     const args = words.slice(i + 1);

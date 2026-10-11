@@ -55,6 +55,7 @@ chk 2 "block: xargs wrapper"                     'xargs rm -rf /tmp/*'
 chk 2 "block: find with a globbed generic start"  'find /tmp/tmp.* -delete'
 chk 2 "block: find, globbed start, -exec rm"      'find /tmp/* -maxdepth 0 -exec rm -rf {} +'
 chk 2 "block: rm in a heredoc fed to a shell"     $'bash <<EOF\nrm -rf /tmp/*\nEOF'
+chk 2 "block: wrapper then --"                     'sudo -- rm -rf /tmp/*'
 # ── ALLOW (exit 0) ────────────────────────────────────────────────────────────
 chk 0 "allow: a literal directory"                 'rm -rf /tmp/gate-abc123'
 chk 0 "allow: glob below the first level"          'rm /tmp/mydir/*.log'
@@ -77,27 +78,5 @@ chk 0 "allow: own prefix with extension"           'rm -f /tmp/scratch-r5.tfstat
 chk 0 "allow: braced variable under /tmp"        'rm -rf /tmp/${run_id}'
 chk 0 "allow: braced variable under TMPDIR"      'rm -rf "$TMPDIR"/${name}-out'
 chk 0 "allow: find with an own-prefix glob start" 'find /tmp/myrun-* -delete'
-
-t_summary
-bash <<EOF\nrm -rf /tmp/*\nEOF'
-# ── ALLOW (exit 0) ────────────────────────────────────────────────────────────
-chk 0 "allow: a literal directory"                 'rm -rf /tmp/gate-abc123'
-chk 0 "allow: glob below the first level"          'rm /tmp/mydir/*.log'
-chk 0 "allow: home path"                           'rm -rf ~/x'
-chk 0 "allow: relative path"                       'rm -f ./out'
-chk 0 "allow: git rm"                              'git rm -r dir'
-chk 0 "allow: rm only in an echo string"           'echo "rm -rf /tmp/*"'
-chk 0 "allow: find -delete under a subdirectory"   'find /tmp/mine -delete'
-chk 0 "allow: ls is not a delete"                  'ls /tmp/*'
-chk 0 "allow: quoted glob is a literal name"       "rm -rf '/tmp/*'"
-chk 0 "allow: literal under TMPDIR"                'rm -rf "$TMPDIR/mine-123"'
-chk 0 "allow: /var/folders C dir"                  'rm -rf /var/folders/ab/cdef/C/x'
-chk 0 "allow: rm in a heredoc body"                $'cat <<EOF\nrm -rf /tmp/*\nEOF'
-chk 0 "allow: unset variable path"                 'rm -rf $mydir'
-chk 0 "allow: find -delete in the working dir"     'find . -name "*.tmp" -delete'
-chk 0 "allow: a worktree path"                     'rm -rf /work/trees/x'
-chk 0 "allow: distinctive own prefix"              'rm /tmp/wdcap-*.txt'
-chk 0 "allow: own literal and own prefix"          'rm -rf /tmp/rvrev /tmp/rvrev.*'
-chk 0 "allow: own prefix with extension"           'rm -f /tmp/scratch-r5.tfstate*'
 
 t_summary
