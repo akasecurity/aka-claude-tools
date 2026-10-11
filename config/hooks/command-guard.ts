@@ -216,6 +216,124 @@ function misorderedPkill(cmd: string, platform: string = process.platform): stri
   return null;
 }
 
+// ── rm over the shared temp folders ────────────────────────────────────────────────────
+// /tmp, /var/tmp and /var/folders/*/*/T are shared by every session on the host, so a globbed
+// `rm -rf /tmp/tmp.*` deletes other sessions' working directories. Blocks rm/rmdir/unlink and
+// find -delete / -exec rm when a path there globs in the root, selects among its entries with a
+// short or generic prefix, or is the root itself. Quoted globs, variables and a distinctive own
+// prefix (/tmp/wdcap-*.txt) pass. Strings are parsed only, never run.
+interface GlobWord { t: string; g: boolean[] } // the text and, per char, "an unquoted glob char"
+const TEMP_GLOB_CHARS = new Set(['*', '?', '[', '{']);
+const TEMP_PREFIX_WRAPPERS = new Set(['sudo', 'command', 'env', 'nice', 'time', 'nohup', 'exec', 'builtin']);
+const baseName = (t: string) => t.slice(t.lastIndexOf('/') + 1);
+
+function globCommands(cmd: string): GlobWord[][] {
+  const s = stripHeredocs(cmd);
+  const cmds: GlobWord[][] = [];
+  let cur: GlobWord[] = [];
+  let w: GlobWord | null = null;
+  let q: string | null = null;
+  const add = (c: string, glob: boolean) => { w ??= { t: '', g: [] }; w.t += c; w.g.push(glob); };
+  const endWord = () => { if (w) { cur.push(w); w = null; } };
+  const endCmd = () => { endWord(); if (cur.length) cmds.push(cur); cur = []; };
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q === "'") { if (c === "'") q = null; else add(c, false); continue; }
+    if (q === '"') {
+      if (c === '"') q = null;
+      else if (c === '\\' && i + 1 < s.length) add(s[++i], false);
+      else add(c, false);
+      continue;
+    }
+    if (c === "'" || c === '"') { q = c; w ??= { t: '', g: [] }; continue; }
+    if (c === '\\' && i + 1 < s.length) { add(s[++i], false); continue; }
+    if (c === '#' && !w) { while (i < s.length && s[i] !== '\n') i++; endCmd(); continue; }
+    if (/\s/.test(c)) { if (c === '\n') endCmd(); else endWord(); continue; }
+    if (';&|()`'.includes(c)) { endCmd(); continue; }
+    add(c, TEMP_GLOB_CHARS.has(c));
+  }
+  endCmd();
+  return cmds;
+}
+
+// The block reason when `w` names the shared temp root, or a glob over it, else null.
+function tempPathRefusal(w: GlobWord): string | null {
+  let t = w.t;
+  let g = w.g.slice();
+  const tm = t.match(/^(\$TMPDIR|\$\{TMPDIR\})/);
+  if (tm) {
+    const root = '/var/folders/@/@/T';
+    t = root + t.slice(tm[0].length);
+    g = [...root].map(() => false).concat(g.slice(tm[0].length));
+  }
+  // Collapse // and a /private prefix, keeping the glob mask aligned with the text.
+  const keep: number[] = [];
+  for (let i = 0; i < t.length; i++) { if (i > 0 && t[i] === '/' && t[i - 1] === '/') continue; keep.push(i); }
+  let nt = keep.map((i) => t[i]).join('');
+  let ng = keep.map((i) => g[i]);
+  if (nt.startsWith('/private/')) { nt = nt.slice(8); ng = ng.slice(8); }
+  while (nt.length > 1 && nt.endsWith('/')) { nt = nt.slice(0, -1); ng = ng.slice(0, -1); }
+  const comp = (from: number) => {
+    let end = nt.indexOf('/', from);
+    if (end < 0) end = nt.length;
+    return { text: nt.slice(from, end), glob: ng.slice(from, end).some(Boolean), end };
+  };
+  let rootEnd: number;
+  let rootGlob = false;
+  const m = nt.match(/^\/(tmp|var\/tmp)(?=\/|$)/);
+  if (m) rootEnd = m[0].length;
+  else if (/^\/var\/folders(\/|$)/.test(nt)) {
+    const a = comp('/var/folders/'.length);
+    const b = a.end < nt.length ? comp(a.end + 1) : null;
+    const t3 = b && b.end < nt.length ? comp(b.end + 1) : null;
+    if (!b || !t3) return 'a bare part of /var/folders';
+    if (t3.text !== 'T' && !t3.glob) return null; // /var/folders/xx/yy/C and the like are not the temp dir
+    rootGlob = a.glob || b.glob || t3.glob;
+    rootEnd = t3.end;
+  } else return null;
+  if (rootGlob) return 'a glob in the shared temp root path';
+  if (nt.slice(rootEnd) === '') return 'the shared temp root itself';
+  const first = comp(rootEnd + 1);
+  if (first.glob) {
+    const gi = ng.slice(first.end - first.text.length, first.end).findIndex(Boolean);
+    const prefix = first.text.slice(0, gi);
+    if (prefix.length < 4 || /^(tmp|temp|mktemp)\.?$/i.test(prefix)) return "a glob selecting among other sessions' temp dirs";
+  }
+  return null;
+}
+
+// Returns a block reason when `cmd` removes shared temp entries by glob, or the temp root.
+function tempRmRefusal(cmd: string): string | null {
+  if (!/\b(rm|rmdir|unlink|find)\b/.test(cmd)) return null;
+  for (const words of globCommands(cmd)) {
+    let i = 0;
+    while (i < words.length && (TEMP_PREFIX_WRAPPERS.has(baseName(words[i].t)) || /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i].t))) i++;
+    const name = words[i] ? baseName(words[i].t) : '';
+    const args = words.slice(i + 1);
+    if (name === 'rm' || name === 'rmdir' || name === 'unlink') {
+      let dashes = false;
+      for (const a of args) {
+        if (!dashes && a.t === '--') { dashes = true; continue; }
+        if (!dashes && a.t.startsWith('-')) continue;
+        const r = tempPathRefusal(a);
+        if (r) return `${name}: ${r} (${a.t})`;
+      }
+    } else if (name === 'find') {
+      const starts: GlobWord[] = [];
+      for (const a of args) { if (a.t.startsWith('-') || a.t === '(' || a.t === '!') break; starts.push(a); }
+      const txt = args.map((a) => a.t);
+      const del = txt.includes('-delete') || txt.some((t, k) => /^-exec(dir)?$/.test(t) && ['rm', 'rmdir', 'unlink'].includes(baseName(txt[k + 1] ?? '')));
+      if (del) {
+        for (const a of starts) {
+          const r = tempPathRefusal(a);
+          if (r && !r.startsWith('a glob selecting')) return `find -delete: ${r} (${a.t})`;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 // Messages are the kit's public contract; tests/golden pins them. Keys are guard-core RuleIds.
 const BLOCK_MSG: Record<RuleId, (detail?: string) => string> = {
   'pipe-to-shell': () => '🚨 BLOCKED (command-guard): piping output into a shell interpreter (curl … | bash). Download, inspect, then run.',
@@ -383,6 +501,14 @@ async function main(): Promise<void> {
     const bad = misorderedPkill(command);
     if (bad) {
       console.error(P + `🚨 BLOCKED (command-guard): on macOS ${bad} stops parsing options at the first pattern, so any option or word after it (-u, a uid, --) is treated as another pattern and can match almost every process. Put options first and give one pattern (join several with |): \`${bad} -u "$(id -u)" -f '<pattern>'\`. Preview matches with \`pgrep -lf\`.`);
+      process.exit(2);
+    }
+  } catch { /* a parser bug must never block or crash the hook */ }
+
+  try {
+    const why = tempRmRefusal(command);
+    if (why) {
+      console.error(P + `🚨 BLOCKED (command-guard): ${why}. /tmp, /var/tmp and the per-user temp dir are shared by every session on this host, so a glob there can delete other sessions' working directories. Remove your own entries by their exact names, or by a distinctive prefix of your own (e.g. \`rm -rf /tmp/myrun-*\`).`);
       process.exit(2);
     }
   } catch { /* a parser bug must never block or crash the hook */ }

@@ -9,6 +9,10 @@ Pre-1.0: minor versions may carry breaking changes; they are called out below.
 ## [Unreleased]
 
 ### Fixed
+- **command-guard blocks globbed `rm` over the shared temp folders.** `rm`/`rmdir`/`unlink` and `find -delete` / `-exec rm`
+  are refused when a path in `/tmp`, `/var/tmp` or the per-user `/var/folders/*/*/T` (also `$TMPDIR`) globs in the root,
+  selects among its entries with a short or generic prefix (`tmp.*`, `t*`), or is the root itself, so other sessions on the
+  host keep their working directories. A distinctive own prefix (`/tmp/myrun-*`), a literal name, quoted globs and variables still pass.
 - **command-guard blocks BSD `pkill`/`pgrep` with a word after the first pattern (macOS only).** BSD option
   parsing stops at the first pattern, so `pkill -f foo -u 501 --` treats `-u`, `501` and `--` as extra OR'd
   patterns and matches almost every process. The block message says to put options first and join patterns with `|`.
