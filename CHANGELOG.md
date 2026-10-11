@@ -8,6 +8,8 @@ Pre-1.0: minor versions may carry breaking changes; they are called out below.
 
 ## [Unreleased]
 
+## [0.5.3] command-guard temp and pkill guards
+
 ### Fixed
 - **command-guard blocks globbed `rm` over the shared temp folders.** `rm`/`rmdir`/`unlink` and `find -delete` / `-exec rm`
   are refused when a path in `/tmp`, `/var/tmp` or the per-user `/var/folders/*/*/T` (also `$TMPDIR`) globs in the root,
@@ -406,7 +408,8 @@ state before the v0.2.0 public-ready prep.
 Initial internal deployment of the isolated-profile installer, the secure-defaults
 base, and the guard hooks.
 
-[Unreleased]: https://github.com/akasecurity/claude-tools/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/akasecurity/claude-tools/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/akasecurity/claude-tools/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/akasecurity/claude-tools/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/akasecurity/claude-tools/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/akasecurity/claude-tools/compare/v0.4.1...v0.5.0
