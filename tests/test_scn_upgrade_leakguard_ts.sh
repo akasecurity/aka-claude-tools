@@ -72,7 +72,7 @@ assert_eq "leak-guard.ts registered via bun" "1" "$bun_ts"
 # stale narrow "WebSearch|WebFetch" — no double-fire, no coverage loss.
 lg_matcher="$(jq -r '[.hooks.PreToolUse[] | select(.hooks[].command | type=="string" and test("leak-guard\\.ts")) | .matcher][0]' "$S")"
 assert_eq "surviving leak-guard reg uses the current broadened matcher" \
-  "WebSearch|WebFetch|mcp__searxng__" "$lg_matcher"
+  "WebSearch|WebFetch|mcp__searxng__.*" "$lg_matcher"
 assert_nlit "the stale bare WebSearch|WebFetch leak-guard group is gone" \
   '"matcher":"WebSearch|WebFetch","hooks"' "$S"
 

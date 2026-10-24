@@ -1629,7 +1629,7 @@ apply_additions() {
     # Register with bun's ABSOLUTE path (same two-token quoted shape as command-guard/
     # statusline/rtk-safe): both tokens shq()-quoted so spaces/metachars/quotes don't split.
     add="$(jq --arg cmd "$(shq "$bun_bin") $cqd/hooks/leak-guard.ts" \
-      '.hooks.PreToolUse += [{matcher:"WebSearch|WebFetch|mcp__searxng__",hooks:[{type:"command",command:$cmd}]}]' <<<"$add")"
+      '.hooks.PreToolUse += [{matcher:"WebSearch|WebFetch|mcp__searxng__.*",hooks:[{type:"command",command:$cmd}]}]' <<<"$add")"
     # Optional: stronger secret detection. Degrades to regex tiers without it.
     ensure_dep trufflehog "trufflehog (leak-guard secret detection)" 0 || true
   fi

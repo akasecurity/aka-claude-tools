@@ -520,7 +520,13 @@ _AKA_HOOK_JQ_DEFS='
 # additions.json matcher for its hook). Format: JSON array of {hook (basename), matcher
 # (the superseded string)}.
 #
-# CURRENTLY EMPTY. The one historical entry was leak-guard's SearXNG matcher broadening
+# CURRENT ENTRY (#2615): leak-guard.ts "WebSearch|WebFetch|mcp__searxng__" → "…|mcp__searxng__.*".
+# Claude Code treats a matcher of only [A-Za-z0-9_|] as a list of EXACT tool names, so the bare
+# "mcp__searxng__" prefix matched no real tool and SearXNG calls skipped the egress guard; an MCP
+# server prefix needs ".*". The old string is subsumed by the new one (the prefix token is covered
+# by the ".*" token), so pruning it can only add coverage.
+#
+# HISTORICAL (no longer listed). The earlier entry was leak-guard's SearXNG matcher broadening
 # ("WebSearch|WebFetch" → "WebSearch|WebFetch|mcp__searxng__"). That entry keyed on the OLD
 # FILE NAME leak-guard.sh; once leak-guard was ported to leak-guard.ts the file ALSO changed,
 # so a pre-port profile's stale "WebSearch|WebFetch" reg now points at leak-guard.sh — a file
@@ -531,7 +537,7 @@ _AKA_HOOK_JQ_DEFS='
 # entry would now FAIL the SUBSET INVARIANT (no live additions.json hook ends in leak-guard.sh).
 # The build_superseded_add machinery below remains for a FUTURE matcher-only broadening (a hook
 # whose FILE NAME is unchanged across the broadening); add an entry then.
-AKA_SUPERSEDED_MATCHERS='[]'
+AKA_SUPERSEDED_MATCHERS='[{"hook":"leak-guard.ts","matcher":"WebSearch|WebFetch|mcp__searxng__"}]'
 
 # build_superseded_add <add-json> → a SYNTHETIC add (JSON on stdout, or {} if none apply)
 # Maps the kit's real registrations (<add-json> — exactly what is registered THIS run) onto

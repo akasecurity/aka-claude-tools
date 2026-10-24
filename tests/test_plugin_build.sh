@@ -20,7 +20,7 @@ cmd="$(jq -r '.hooks.PreToolUse[] | select(.matcher=="Bash") | .hooks[].command'
 bashcount="$(jq -r '.hooks.PreToolUse[] | select(.matcher=="Bash")' "$D/hooks/hooks.json" | jq -s 'length')"
 [[ "$bashcount" -eq 1 ]] || { echo "FAIL: expected exactly 1 Bash PreToolUse entry, got $bashcount"; fails=1; }
 # hooks.json: leak-guard registered on the web-egress matcher via the launcher
-leak="$(jq -r '.hooks.PreToolUse[] | select(.matcher=="WebSearch|WebFetch|mcp__searxng__") | .hooks[].command' "$D/hooks/hooks.json" | grep leak-guard || true)"
+leak="$(jq -r '.hooks.PreToolUse[] | select(.matcher=="WebSearch|WebFetch|mcp__searxng__.*") | .hooks[].command' "$D/hooks/hooks.json" | grep leak-guard || true)"
 [[ "$leak" == *'bun-hook-launch.sh'*'leak-guard.ts'* ]] || { echo "FAIL leak-guard registration: '$leak'"; fails=1; }
 # hooks.json: mcp-guard registered on every MCP tool via the launcher
 mcpg="$(jq -r '.hooks.PreToolUse[] | select(.matcher=="mcp__.*") | .hooks[].command' "$D/hooks/hooks.json" | grep mcp-guard || true)"
