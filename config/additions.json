@@ -24,7 +24,7 @@
       "recommended": true,
       "description": "PreToolUse guard on WebSearch/WebFetch and the SearXNG MCP tools (WEB egress only, Bash egress is command-guard's surface). Blocks web queries/urls/prompts containing detected secrets (trufflehog), token/SSH-key shapes, and (if configured) your org's internal identifiers (CT_EGRESS_PATTERNS, read from the install-compiled org-egress.json sidecar, portable-subset regex only). Covers the SearXNG MCP surface so secure-deep-research's sensitive-topic path (routed through self-hosted SearXNG for privacy) is egress-scanned too (a no-op when no SearXNG server is configured). Runs under bun (like command-guard), a hard dependency: selecting leak-guard aborts the install if bun is absent, rather than shipping a default-on security guard silently disabled. Depth: this matches secret and key SHAPES on egress, not PII/PHI/financial data, and it blocks rather than redacts. It is claude-tools' shallow secret-scan fallback; deep content detection with redaction and an audit trail is ai-tc's job. The two compose: posture here, detection in ai-tc.",
       "hook": "hooks/leak-guard.ts",
-      "matcher": "WebSearch|WebFetch|mcp__searxng__",
+      "matcher": "WebSearch|WebFetch|mcp__searxng__.*",
       "event": "PreToolUse",
       "usesConfig": true
     },

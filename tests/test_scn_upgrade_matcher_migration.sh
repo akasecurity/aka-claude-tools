@@ -8,7 +8,7 @@
 # (double-firing). build_superseded_add + AKA_SUPERSEDED_MATCHERS prune that stale KIT reg before
 # the merge re-adds the current one, while a genuine user matcher tweak is preserved.
 #
-# AKA_SUPERSEDED_MATCHERS is CURRENTLY EMPTY (the one historical entry — leak-guard's SearXNG
+# AKA_SUPERSEDED_MATCHERS now holds one live entry (#2615, section 3); it was EMPTY (the one historical entry — leak-guard's SearXNG
 # broadening — was subsumed by the leak-guard.sh→leak-guard.ts FILE rename, which the marker
 # self-clean handles by basename; see common.sh and test_scn_upgrade_leakguard_ts.sh). So this
 # test pins:
@@ -32,7 +32,11 @@ inv="$(printf '%s' "$SUP" | jq -c --slurpfile add "$REPO_ROOT/config/additions.j
     | ($add[0].additions[] | select((.hook // "" | split("/") | last) == $s.hook) | .matcher) as $cur
     | { hook:$s.hook,
         has_current: ($cur != null),
-        subset: (($cur != null) and (($s.matcher | split("|")) - ($cur // "" | split("|")) | length == 0)) } ]')"
+        subset: (($cur != null) and (($cur // "" | split("|")) as $ct
+          | [ ($s.matcher | split("|"))[] as $t
+              | select(($ct | index($t)) == null
+                       and (($ct | map(select(endswith(".*") and ($t | startswith(.[:-2])))) | length) == 0)) ]
+          | length == 0)) } ]')"
 assert_eq "every superseded entry has a live additions.json matcher" \
   "true" "$(printf '%s' "$inv" | jq -r 'all(.has_current)')"
 assert_eq "every superseded matcher is SUBSUMED by the current kit matcher (no coverage loss)" \
@@ -72,5 +76,19 @@ assert_eq "build_superseded_add yields {} when the add has no superseded hook" \
 # with the LIVE (empty) set, ANY add yields {} (no entries to map onto).
 assert_eq "build_superseded_add yields {} with the live empty set" \
   "{}" "$( source "$REPO_ROOT/shared/lib/common.sh" >/dev/null 2>&1; build_superseded_add "$real_add" )"
+
+# ── 3. LIVE entry (#2615): a profile registered under the old exact "mcp__searxng__" matcher is
+#    rewritten to the prefix matcher "mcp__searxng__.*" (single reg, no double-fire). ──
+if command -v bun >/dev/null 2>&1; then
+  SB3="$(sandbox)"; touch "$SB3/.bashrc"; P3="$SB3/.claude-aka"; mkdir -p "$P3"
+  inst() { CT_ADDITIONS="secure-settings leak-guard" SHELL=/bin/bash HOME="$SB3" bash "$REPO_ROOT/install.sh" --defaults --no-auth-inherit >"$SB3/log" 2>&1; }
+  inst; assert_eq "fresh install exits 0" "0" "$?"
+  OLDM='WebSearch|WebFetch|mcp__searxng__'; NEWM='WebSearch|WebFetch|mcp__searxng__.*'
+  jq --arg o "$OLDM" --arg n "$NEWM" '(.hooks.PreToolUse[] | select(.matcher==$n) | .matcher) |= $o' "$P3/settings.json" > "$SB3/s.json" && mv "$SB3/s.json" "$P3/settings.json"
+  assert_eq "seeded the old exact matcher" "1" "$(jq --arg o "$OLDM" '[.hooks.PreToolUse[]|select(.matcher==$o)]|length' "$P3/settings.json")"
+  inst; assert_eq "upgrade install exits 0" "0" "$?"
+  assert_eq "old exact matcher rewritten to the prefix matcher" "1" "$(jq --arg n "$NEWM" '[.hooks.PreToolUse[]|select(.matcher==$n)]|length' "$P3/settings.json")"
+  assert_eq "no reg left on the old exact matcher" "0" "$(jq --arg o "$OLDM" '[.hooks.PreToolUse[]|select(.matcher==$o)]|length' "$P3/settings.json")"
+fi
 
 t_summary
