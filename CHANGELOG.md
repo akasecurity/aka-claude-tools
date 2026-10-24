@@ -8,6 +8,14 @@ Pre-1.0: minor versions may carry breaking changes; they are called out below.
 
 ## [Unreleased]
 
+## [0.5.4] leak-guard covers every SearXNG MCP tool
+
+### Fixed
+- **The web leak-guard now checks SearXNG MCP tools.** Its PreToolUse matcher `WebSearch|WebFetch|mcp__searxng__`
+  has only exact-match characters, so Claude Code read the bare `mcp__searxng__` as a tool name that matches nothing, and
+  SearXNG calls skipped the guard. The matcher is now `WebSearch|WebFetch|mcp__searxng__.*`; install and upgrade rewrite
+  the old registration (one registration, no double-fire). Hand-tuned matchers are left alone.
+
 ## [0.5.3] command-guard temp and pkill guards
 
 ### Fixed
@@ -408,7 +416,8 @@ state before the v0.2.0 public-ready prep.
 Initial internal deployment of the isolated-profile installer, the secure-defaults
 base, and the guard hooks.
 
-[Unreleased]: https://github.com/akasecurity/claude-tools/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/akasecurity/claude-tools/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/akasecurity/claude-tools/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/akasecurity/claude-tools/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/akasecurity/claude-tools/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/akasecurity/claude-tools/compare/v0.5.0...v0.5.1
