@@ -639,9 +639,158 @@ function parsePatterns(raw) {
 }
 var DEFAULT_PATTERNS = parsePatterns(secret_patterns_default);
 // src/egress/scanner.ts
+import { spawnSync as spawnSync2 } from "child_process";
+
+// src/egress/installed-version.ts
 import { spawnSync } from "child_process";
+import { lstatSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "fs";
+import { delimiter, join } from "path";
+function findBinary(name, pathVar) {
+  for (const dir of (pathVar ?? "").split(delimiter)) {
+    if (!dir)
+      continue;
+    const candidate = join(dir, name);
+    try {
+      if (statSync(candidate).isFile())
+        return candidate;
+    } catch {}
+  }
+  return null;
+}
+var memo;
+function installedTrufflehogVersion(pathVar = process.env.PATH) {
+  const path = findBinary("trufflehog", pathVar);
+  if (!path)
+    return null;
+  let st;
+  try {
+    st = statSync(path);
+  } catch {
+    return null;
+  }
+  const key = `${path}:${st.mtimeMs}:${st.size}`;
+  if (memo?.key === key)
+    return memo.version;
+  const file = join(process.env.TMPDIR || "/tmp", `aka-trufflehog-version-${process.getuid?.() ?? 0}.json`);
+  try {
+    const own = lstatSync(file);
+    if (!own.isFile() || own.uid !== (process.getuid?.() ?? own.uid) || (own.mode & 18) !== 0)
+      throw new Error("untrusted cache file");
+    const c = JSON.parse(readFileSync(file, "utf8"));
+    if (c.path === path && c.mtimeMs === st.mtimeMs && c.size === st.size && typeof c.version === "string") {
+      memo = { key, version: c.version };
+      return c.version;
+    }
+  } catch {}
+  const r = spawnSync(path, ["--version", "--no-update"], { encoding: "utf-8" });
+  const out = `${r.stdout ?? ""}${r.stderr ?? ""}`;
+  const version = /(\d+\.\d+\.\d+)/.exec(out)?.[1] ?? null;
+  memo = { key, version };
+  if (version) {
+    const tmp = `${file}.${process.pid}.tmp`;
+    try {
+      writeFileSync(tmp, JSON.stringify({ path, mtimeMs: st.mtimeMs, size: st.size, version }), { mode: 384, flag: "wx" });
+      renameSync(tmp, file);
+    } catch {
+      try {
+        unlinkSync(tmp);
+      } catch {}
+    }
+  }
+  return version;
+}
+
+// src/egress/prefilter-refinements.ts
+var REFINED_KEYWORDS = {
+  "https://": /https?:\/\/\S{0,60}:\S{3,60}@/i,
+  "http://": /https?:\/\/\S{0,60}:\S{3,60}@/i,
+  github: /[a-zA-Z0-9]{20}|[0-9]{6}|-----BEGIN RSA PRIVATE KEY-----/,
+  gh: /[0-9a-f]{40}/,
+  npm: /[0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/,
+  dm: /vf\.(?:(?:dm|ws)\.)?[a-f0-9]{24}\.[a-z0-9]{16}/i,
+  vf: /vf\.(?:(?:dm|ws)\.)?[a-f0-9]{24}\.[a-z0-9]{16}/i,
+  sid: /AC[0-9a-f]{32}|[0-9a-f]{32}/,
+  "-us": /[0-9a-f]{32}-us[0-9]{1,2}/,
+  "st.": /st\.[0-9a-f]{8}-[0-9a-f]{4}-/,
+  rev: /[0-9a-zA-Z/+-]{27}/,
+  wit: /[A-Z0-9]{32}/,
+  live_: /(?:live|test)_[a-f0-9]{35}/,
+  test_: /(?:live|test)_[a-f0-9]{35}/,
+  tly: /[0-9A-Za-z]{60}/,
+  re_: /re_[1-9A-HJ-NP-Za-km-z]{8}_[1-9A-HJ-NP-Za-km-z]{24}/,
+  vault: /hvs\.[A-Za-z0-9_-]{90,120}|s\.[A-Za-z0-9_-]{18,40}/,
+  harness: /pat\.[A-Za-z0-9_]{22}\.[0-9a-f]{24}\.[A-Za-z0-9]{20}/
+};
+
+// src/egress/trufflehog-keywords.generated.ts
+var TRUFFLEHOG_KEYWORDS_VERSION = "3.99.7";
+var TRUFFLEHOG_KEYWORDS = ['"auths"', "-nrma", "-us", ".apps.googleusercontent.com", ".atlasv1.", ".azconfig.io", ".azure-api.net", ".azurecr.io", ".batch.azure.com", ".blob.core.windows.net", ".documents.azure.com", ".fibery.io", ".management.azure-api.net", ".okta", ".onmicrosoft.com", ".openai.azure.com", ".scm.azure-api.net", ".table.cosmos.azure.com", "0.a", "1.a", "1000.", "3mvg9", "5aep861", "8x8", "@apiconnector.com", "\\\"auths\\", "_mmk", "_secret_", "abia", "abuseipdb", "abyssale", "acca", "accessid", "accesskey", "account-", "account-key", "account-name", "account.key", "account.name", "account_key", "account_name", "accountkey", "accountname", "accuweather", "adzuna", "aeroworkflow", "agora", "aha.io", "aio_", "airbrake", "airship", "airtable", "airvisual", "aiven", "aizasy", "ak_live_", "akcp", "akia", "alchemy", "alcht_", "alegra", "aletheiaapi", "algolia", "alienvault", "allsports", "amadeus", "ambee", "amplitude", "amqp", "anypoint", "apacta", "api-", "api2cart", "api_org_", "apideck", "apiflash", "apifonica", "apify", "apilayer", "apimatic", "apimetrics", "apitemplate", "appcues", "appfollow", "appointedd", "appsynergy", "apptivo", "artifactory", "artsy", "asana", "asia", "assemblyai", "atbb", "atctt3xffg", "atera", "atlassian", "audd", "auth0", "autodesk", "autoklose", "autopilot", "avaza", "aviationstack", "axonaut", "aylien", "ayrshare", "az", "azure", "bannerbear", "baremetrics", "bb_ma_", "bb_pr_", "bbdc-", "bbff-", "beamer", "beebole", "begin ec", "besttime", "betterstack", "billomat", "bitbar", "bitbucket", "bitcoinaverage", "bitfinex", "bitly", "bitmex", "bkua_", "blazemeter", "blitapp", "blogger", "bombbomb", "boostnote", "borgbase", "box", "braintree", "braintrust", "brandfetch", "browserstack", "browshot", "bscscan", "buddyns", "budibase", "bugherd", "bugsnag", "buildkite", "bulbul", "bulksms", "buttercms", "caflou", "calendarific", "calendly", "calorieninja", "campayn", "canny", "capsulecrm", "captaindata", "carboninterface", "cashboard", "caspio", "ccipat_", "censys", "centralstationcrm", "cex.io", "cexio", "cfat_", "cfk_", "cfpat-", "cfut_", "chartmogul", "chatbot", "chatfuel", "checio", "checklyhq", "checkout", "checkvist", "cicero", "circle", "clarifai", "clearbit", "cli_", "clickhelp.co", "clicksendsms", "clickup", "cliengo", "clientary", "clinchpad", "clockify", "clockworksms", "close", "cloudconvert", "cloudelements", "cloudflare", "cloudimage", "cloudinary", "cloudmersive", "cloudplan", "cloudsmith", "cloverly", "cloze", "clustdoc", "cmvmdgtu", "coda", "codacy", "codeclimate", "codemagic", "codequiry", "coinapi", "coinlayer", "coinlib", "collect2", "column", "commercejs", "commodities", "companyhub", "confluence", "confluent", "conversiontools", "convertapi", "convertkit", "convier", "copper", "core.windows.net", "couchbase://", "couchbases://", "countrylayer", "courier", "coveralls", "craftmypdf", "crowdin", "cryptocompare", "currencycloud", "currencyfreaks", "currencylayer", "currencyscoop", "currentsapi", "customerguru", "customerio", "d7network", "da2-", "dandelion", "dapi", "dareboost", "data source", "data.gov", "database", "databox", "databricks", "datadog", "dckr_oat_", "dckr_pat_", "ddog-gov", "ddp_", "ddw_", "deepai", "deepgram", "deepseek", "defaultendpointsprotocol=http", "delighted", "demio", "deputy", "detectify", "detectlanguage", "dfuse", "diffbot", "diggernaut", "digitalocean", "discord", "disqus", "ditto", "dm", "dnscheck", "docker", "docparser", "docsearch", "documo", "docusign", "doo_v1_", "dop_v1_", "dor_v1_", "dovico", "dp.audit.", "dp.ct.", "dp.pt.", "dp.sa.", "dp.scim.", "dp.st", "dronahq", "droneci", "dropbox", "duffel_live_", "duffel_test_", "duosecurity", "duply", "dwolla", "dynalist", "dyspatch", "eaaa", "eagleeyenetworks", "easy-insight", "easyinsight", "ecostruxureit", "edamam", "edenai", "elasticemail", "elevenlabs", "enablex", "endpointsuffix", "endr+", "enigma", "entra", "environment.api.powerplatform.com", "envoy", "eraser", "etherscan", "ethplorer", "eventbrite", "everhour", "ewogic", "ewoid", "exchange-rate", "exchangerate", "exchangerates", "exportsdk", "extractorapi", "eyj", "eyj0exaioijkv1qilcjhbgcioijsuzi1nij9", "facebook", "faceplusplus", "fastforex", "fastly", "feedier", "fetchrss", "ffffnral", "figma", "figp_", "fileio", "finage", "financialmodelingprep", "findl", "finnhub", "fio-u-", "fixer", "flat", "fleetbase", "flickr", "flightapi", "flightstats", "float", "flowflu", "flwseck-", "flyv1", "fmfw", "formbucket", "formcraft", "formio", "formsite", "foursquare", "freshbooks", "freshdesk", "freshworks", "front", "ftp://", "fulcrum", "fullstory", "fw_", "fxmarket", "geckoboard", "gengo", "geoapify", "geocod", "geocode", "geocodify", "geoip", "getgeoapi", "getgist", "getresponse", "getsandbox", "gh", "gho_", "ghp_", "ghr_", "ghs_", "ghu_", "github", "github_pat_", "gitlab", "gitter", "glassnode", "glc_eyj", "gloas-", "glpat-", "glsa_", "gocanvas", "gocardless", "godaddy", "goodday", "graphcms", "graphhopper", "groovehq", "gsk_", "gtmetrix", "guardianapi", "gumroad", "gyazo", "hapi_key", "hapikey", "happyscribe", "harness", "harvest", "hashicorp", "hasura", "hellosign", "helpcrunch", "helpscout", "hereapi", "heroku", "hf_", "hiveage", "holidayapi", "holistic", "honeycomb", "hooks.slack.com", "host.io", "hrku-aa", "html2pdf", "http://", "https://", "https://discord.com/api/webhooks/", "hubapi", "hubspot", "humanity", "humio", "hunter", "hvb.", "hvs.", "hybiscus", "hypertrack", "iconfinder", "iexapis", "iexcloud", "imagekit", "imagga", "impala", "infura", "insightly", "instabot", "instamojo", "intercom", "interseller", "intrinio", "invoiceocean", "ip2location", "ipapi", "ipgeolocation", "ipifi", "ipinfo", "ipinfodb", "ipquality", "ipstack", "jdbc", "jfrog.io", "jira", "jotform", "jumpcloud", "jupiterone", "juro", "k_live", "kanban", "kanbantool", "karmacrm", "keen", "key-", "kickbox", "klipfolio", "knapsackpro", "kontent", "kpat_", "kraken", "kucoin", "kylas", "ladesk", "languagelayer", "lark", "larksuite", "ldap://", "ldaps://", "leadfeeder", "lemlist", "lemonsqueezy", "lendflow", "lessannoyingcrm", "lexigram", "lin_api_", "linenotify", "linkpreview", "live_", "liveagent", "livestorm", "loadmill", "locationiq", "loggly", "login.microsoftonline.com", "loginradius", "logscale", "logz", "lokalise", "loyverse", "lsv2_pt_", "lsv2_sk_", "ltai", "lunchmoney", "luno", "madkudu", "magicbell", "mailboxlayer", "mailerlite", "mailgun", "mailjet", "mailmodo", "mailsac", "mandrill", "mapbox", "mapquest", "marketstack", "master-", "mattermost", "mavenlink", "maxmind", "meaningcloud", "mediastack", "meistertask", "meraki", "mesibo", "messagebird", "meta-api", "metaapi", "metabase", "metrilo", "mindmeister", "miro", "mite", "mixmax", "mockaroo", "moderation", "monday", "mongodb", "monkeylearn", "moonclerk", "moosend", "moralis", "mrticktock", "msal", "mux", "myintervals", "myshopify.com", "netcore", "nethunt", "netlify", "netsuite", "network address=", "neutrinoapi", "newrelic", "newsapi", "newscatcher", "nexmo", "nftport", "ngc", "ngrok", "nicereply", "nightfall", "nimble", "noticeable", "notion", "nozbe", "nozbeteams", "npm", "npm_", "nrak-", "nrbr-", "nrii-", "nriq-", "nuget", "numverify", "nutritionix", "nvapi-", "nylas", "oanda", "octopus", "omnisend", "onedesk", "onelogin", "onepagecrm", "onesignal", "onfleet", "online.tableau.com", "oopspam", "opencagedata", "openuv", "openvpn", "openweather", "opsgenie", "optimizely", "overloop", "owlbot", "packagecloud", "pager_duty", "pagerduty", "pandadoc", "pandascore", "paperform", "paralleldots", "parsehub", "parsers", "parseur", "partnerstack", "pastebin", "pat-eu1-", "pat-na1-", "paydirtapp", "paymoapp", "paymongo", "paypal", "paystack", "pcsk_", "pd-", "pd_", "pdflayer", "pdfshift", "peopledatalabs", "pepipost", "percy", "pgar_", "photoroom", "phrase", "phx_", "pinata", "pipedream", "pipedrive", "pivotal", "pixabay", "pk-lf-", "pk_", "plaid", "planview", "planviewleankit", "planyo", "plivo", "pmak-", "pnu_", "podio", "pollsapi", "poloniex", "polygon", "portainer", "portainertoken", "positionstack", "postageapp", "postbacks", "postgres", "postmark", "powrbot", "privacy", "private key", "prodpad", "prospectcrm", "protocols", "provider_x509", "proxycrawl", "pscale_pw_", "pscale_tkn_", "pul-", "purestake", "pushbullet", "pusher", "pypi-ageichlwas5vcmccj", "pyxis", "qase", "qualaroo", "qubole", "q~", "r8_", "railway", "ramp_", "rapidapi", "rawg", "rdme_", "re_", "reachmail", "reallysimplesystems", "rebrandly", "redhat", "redis", "refiner", "rentman", "repairshopr", "replicate", "replyio", "requestfinance", "restpack", "rev", "revampcrm", "rh-api-", "ringcentral", "ritekit", "roaring", "rocketreach", "ronin", "rootly_", "route4me", "rownd", "rubygems", "runrunit", "runscope", "rzp_live_", "s-s4t2af-", "s-s4t2ud-", "salad_cloud_", "salesblink", "salescookie", "salesflare", "salesforce", "salesmate", "sanity", "satismeter", "saucelabs", "sbp_", "scaleway", "scalr", "scrapeowl", "scraperapi", "scraperbox", "scrapestack", "scrapfly", "scraping bee", "scraping-bee", "scraping_bee", "scrapingant", "scrapingbee", "screenshotapi", "screenshotlayer", "scrutinizer", "sdk-", "secret_", "security trails", "securitytrails", "segment", "selectpdf", "semaphore.co", "sendbird", "sentry", "serphouse", "serpstack", "server=", "sg.", "sgp_", "sheety", "sherpadesk", "shipday", "shippo_live_", "shippo_test_", "shltm_", "shodan", "shortcut", "shotstack", "shpat_", "shppa_", "shpss_", "shutterstock", "sid", "signable", "signalwire", "signaturit", "signupgenius", "sigopt", "simfin", "simplesat", "simplynoted", "simvoly", "sinch", "sirv", "siteleaf", "sk-admin-", "sk-ant-admin01", "sk-ant-api03", "sk-lf-", "sk-or-v1-", "sk_10x3", "sk_1x1", "sk_1x3", "sk_2x1", "sk_2x2", "sk_3x3", "sk_5x3", "sk_test_10x3", "sk_test_1x1", "sk_test_1x3", "sk_test_2x1", "sk_test_2x2", "sk_test_3x3", "sk_test_5x3", "skrapp", "skybiometry", "sl.", "slk_", "smartsheet", "smartystreets", "smooch", "snipcart", "snowflake", "sntrys_eyj", "sntryu", "snyk", "solarwinds", "sonar", "spark", "spat_", "speechtext", "splunk", "spoonacular", "sportsmonk", "spu-", "sq0i", "sqa_", "sqco_", "sql", "sqp_", "squ_", "squarespace", "sslmate", "st.", "statuscake", "statuspage", "statuspal", "stitchdata", "stockdata", "storage-account", "storage.account", "storage_account", "storageaccount", "storecove", "stormboard", "stormglass", "storyblok", "storychief", "strava", "streak", "stripo", "stytch", "sub-c-", "sugester", "sumo", "supernotes", "surveyanyplace", "surveybot", "surveysparrow", "survicate", "swell", "swiftype", "t3blbkfj", "tableau", "tallyfy", "tatum", "taxjar", "teamgate", "teamwork", "teamworkcrm", "teamworkdesk", "teamworkspaces", "technicalanalysisapi", "tefter", "telegram", "teletype", "telnyx", "test_", "testingbot", "textanywhere", "textmagic", "tfp_", "tgram", "the-odds-api", "theoddsapi", "thinkific", "thog", "thousandeyes", "ticketmaster", "tickettailor", "tiingo", "timecamp", "timezoneapi", "tines.com", "tly", "tmetric", "todoist", "tokeet", "tomorrow", "tomtom", "tradier", "transferwise", "travelpayouts", "travis", "trello", "tskey-", "tskey-api-", "tskey-oauth-", "twelvedata", "twilio", "twist", "twitch", "twitter", "tyntec", "typeform", "typetalk", "uclassify", "unify", "unplu", "unsplash", "upcdatabase", "uplead", "uploadcare", "uptimerobot", "upwave", "urlscan", "user.com", "userflow", "userstack", "vagrant", "vatlayer", "vault", "vbout", "vercel", "verifier", "verimail", "veriphone", "versioneye", "vf", "viewneo", "virustotal", "visualcrossing", "voicegain", "voodoosms", "vouchery", "vpnapi", "vultr", "vyte", "walkscore", "wandb", "wandb_v1_", "weatherbit", "weatherstack", "web3", "webex", "webflow", "webhook.office.com", "webscraper", "webscraping", "websitepulse", "whoxy", "wiki", "wistia", "wit", "wiz", "worksnaps", "workstack", "worldcoinindex", "worldweather", "wrike", "x-recharge-access-token", "xai-", "xi-api-key", "xi_api_key", "xkeysib", "xoxa-", "xoxb-", "xoxp-", "xoxr-", "ya29.", "yandex", "yelp", "youneedabudget", "yousign", "youtube", "zendesk", "zenkit", "zenrows", "zenscrape", "zenserp", "zeplin", "zerobounce", "zerotier", "zipapi", "zipbooks", "zipcodeapi", "zipcodebase", "zonka", "zulip"];
+
+// src/egress/prefilter.ts
+var lowerAscii = (s) => s.replace(/[A-Z]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 32));
+var escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+var STRONG = TRUFFLEHOG_KEYWORDS.filter((k) => !(k in REFINED_KEYWORDS));
+var STRONG_RE = new RegExp(STRONG.map(escapeRe).join("|"));
+var WEAK_RE = new RegExp(Object.keys(REFINED_KEYWORDS).map(escapeRe).join("|"), "g");
+var ESCAPE_OR_UTF16 = /\\u|\\x\{|u\+|&#|%u|&[a-z][a-z0-9]*;|\\[0-9a-f]{1,6}(?:\s|\\|$)|\0/i;
+var HTML_GATE = /<[a-z][a-z0-9]*(?::[a-z][a-z0-9]*)?[\s>/]|&lt;[a-z]/i;
+var B64_RUN = /[A-Za-z0-9+/\-_=]{21,}/g;
+var STD_B64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+var RAW_URL_B64 = /^[A-Za-z0-9\-_]*$/;
+var END_CHARS = /^[+/\-_=]+/;
+function decodesToAscii(candidate) {
+  const attempts = [["base64", STD_B64]];
+  if (RAW_URL_B64.test(candidate) && candidate.length % 4 !== 1)
+    attempts.push(["base64url", RAW_URL_B64]);
+  for (const [encoding, valid] of attempts) {
+    if (!valid.test(candidate))
+      continue;
+    const bytes = Buffer.from(candidate, encoding);
+    if (bytes.length > 0 && bytes.every((b) => b < 128))
+      return true;
+  }
+  return false;
+}
+function base64Decodes(text) {
+  for (const run of text.match(B64_RUN) ?? []) {
+    const trimmed = run.replace(END_CHARS, "");
+    const body = trimmed.replace(/[+/\-_=]+$/, "");
+    const inner = body.indexOf("=");
+    const candidate = inner === -1 ? trimmed : trimmed.slice(inner + 1);
+    if (decodesToAscii(candidate))
+      return true;
+  }
+  return false;
+}
+function hasKeyword(text) {
+  const lower = lowerAscii(text);
+  if (STRONG_RE.test(lower))
+    return true;
+  WEAK_RE.lastIndex = 0;
+  const seen = new Set;
+  for (let m = WEAK_RE.exec(lower);m; m = WEAK_RE.exec(lower)) {
+    if (seen.has(m[0]))
+      continue;
+    seen.add(m[0]);
+    if (REFINED_KEYWORDS[m[0]].test(text))
+      return true;
+  }
+  return false;
+}
+var MAX_SKIPPABLE_BYTES = 8000;
+function mayContainSecret(text) {
+  if (Buffer.byteLength(text) > MAX_SKIPPABLE_BYTES)
+    return true;
+  if (ESCAPE_OR_UTF16.test(text) || HTML_GATE.test(text) || base64Decodes(text))
+    return true;
+  return hasKeyword(text);
+}
+
+// src/egress/scanner.ts
 var trufflehogScanner = (text) => {
-  const r = spawnSync("trufflehog", ["stdin", "--json", "--no-update", "--no-verification"], { input: text, encoding: "utf-8" });
+  if (installedTrufflehogVersion() === TRUFFLEHOG_KEYWORDS_VERSION && !mayContainSecret(text))
+    return "clean";
+  const r = spawnSync2("trufflehog", ["stdin", "--json", "--no-update", "--no-verification"], { input: text, encoding: "utf-8" });
   if (r.error)
     return "unavailable";
   return (r.stdout || "").includes('"DetectorName"') ? "found" : "clean";
@@ -1013,8 +1162,8 @@ function rewrite(command) {
   return null;
 }
 // src/aitc/detect.ts
-import { existsSync, readdirSync, readFileSync } from "fs";
-import { isAbsolute, join, resolve } from "path";
+import { existsSync, readdirSync, readFileSync as readFileSync2 } from "fs";
+import { isAbsolute, join as join2, resolve } from "path";
 var DEFAULT_ROOTS = {
   claude: [".claude"],
   codex: [".codex"],
@@ -1035,17 +1184,17 @@ function readJson(readFile, p) {
 }
 var isObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 function enabledClaudePlugins(root, readFile) {
-  const registry = readJson(readFile, join(root, "plugins/installed_plugins.json"));
+  const registry = readJson(readFile, join2(root, "plugins/installed_plugins.json"));
   if (!isObject(registry) || !isObject(registry.plugins))
     return new Set;
-  const settings = readJson(readFile, join(root, "settings.json"));
+  const settings = readJson(readFile, join2(root, "settings.json"));
   const enabled = isObject(settings) && isObject(settings.enabledPlugins) ? settings.enabledPlugins : {};
   return new Set(Object.keys(registry.plugins).filter((k) => enabled[k] === true));
 }
 function projectDisabledClaudePlugins(projectDir, readFile) {
   const disabled = new Set;
   for (const file of ["settings.json", "settings.local.json"]) {
-    const settings = readJson(readFile, join(projectDir, ".claude", file));
+    const settings = readJson(readFile, join2(projectDir, ".claude", file));
     if (!isObject(settings) || !isObject(settings.enabledPlugins))
       continue;
     for (const [k, v] of Object.entries(settings.enabledPlugins)) {
@@ -1066,44 +1215,44 @@ function detectAitc(harness, opts) {
   });
   const readFile = opts.readFile ?? ((p) => {
     try {
-      return readFileSync(p, "utf-8");
+      return readFileSync2(p, "utf-8");
     } catch {
       return null;
     }
   });
   const home = isAbsolute(opts.home) ? opts.home : null;
-  const rawRoots = opts.roots !== undefined ? opts.roots : home ? DEFAULT_ROOTS[harness].map((r) => join(home, r)) : [];
+  const rawRoots = opts.roots !== undefined ? opts.roots : home ? DEFAULT_ROOTS[harness].map((r) => join2(home, r)) : [];
   const roots = [...new Set(rawRoots.filter((r) => !!r && isAbsolute(r)).map((r) => resolve(r)))];
   const markers = [];
   if (harness === "claude") {
     const projectDir = opts.projectDir !== undefined && isAbsolute(opts.projectDir) ? resolve(opts.projectDir) : null;
     const projectDisabled = projectDir ? projectDisabledClaudePlugins(projectDir, readFile) : new Set;
     for (const r of roots) {
-      const cache = join(r, "plugins/cache");
+      const cache = join2(r, "plugins/cache");
       let enabled;
       for (const marketplace of readdir(cache)) {
-        const mk = join(cache, marketplace);
+        const mk = join2(cache, marketplace);
         for (const d of readdir(mk)) {
           if (!isAitcClaudePlugin(d, marketplace))
             continue;
           enabled ??= enabledClaudePlugins(r, readFile);
           const key = `${d}@${marketplace}`;
           if (enabled.has(key) && !projectDisabled.has(key))
-            markers.push(join(mk, d));
+            markers.push(join2(mk, d));
         }
       }
     }
   } else if (harness === "codex") {
     for (const r of roots) {
-      const cache = join(r, "plugins/cache");
+      const cache = join2(r, "plugins/cache");
       for (const m of readdir(cache)) {
-        const p = join(cache, m, "aka-codex");
+        const p = join2(cache, m, "aka-codex");
         if (exists(p))
           markers.push(p);
       }
     }
   } else if (harness === "antigravity" && home) {
-    const p = join(home, ".gemini/config/plugins/aka-antigravity");
+    const p = join2(home, ".gemini/config/plugins/aka-antigravity");
     if (exists(p))
       markers.push(p);
   }
@@ -1112,7 +1261,7 @@ function detectAitc(harness, opts) {
     present: uniqueMarkers.length > 0,
     harness,
     markers: uniqueMarkers,
-    sharedState: home ? exists(join(home, ".aka/data/aka.db")) : false
+    sharedState: home ? exists(join2(home, ".aka/data/aka.db")) : false
   };
 }
 // src/aitc/policy.ts
