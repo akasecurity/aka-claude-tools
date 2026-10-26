@@ -137,7 +137,7 @@ A guard you haven't watched fire is one you're only assuming works. Launch the p
 
 ## What's inside
 
-<p align="center"><img src="media/whats-inside.svg" alt="What's inside: additions grouped by what they do (graphic not yet refreshed for this release's count)." width="100%"></p>
+<p align="center"><img src="media/whats-inside.svg" alt="What's inside: additions grouped by what they do." width="100%"></p>
 
 Nineteen additions; the menu is driven entirely by
 [`config/additions.json`](config/additions.json), the single source both install paths read.
@@ -145,25 +145,25 @@ Prefer a visual tour? See the [what's-inside carousel](media/decks/whats-inside.
 
 | Addition | What it does | Default |
 |---|---|---|
-| `secure-settings` | Denies reads of SSH keys, cloud creds, `.env`, keychains; blocks writes to shell startup files; no auto-loaded MCP servers. | ● on |
-| `sandbox` | Enables Claude Code's native OS-level sandbox, so Bash and every other tool run confined, not just the Read tool. Claude Code's own sandbox already merges `secure-settings`'s Read-deny credential paths into its filesystem restrictions at runtime, so this addition doesn't duplicate that list itself. While selected it owns `sandbox.enabled` (a manual edit back to `false` is warned about and set back to `true` on the next apply; deselect the addition to actually turn the sandbox off). Changes Bash behavior in every session; needs `bwrap` and `socat` on PATH on Linux (macOS always supported; skipped elsewhere with a notice). | ○ opt-in |
-| `leak-guard` | Scans what the agent sends to the web and blocks anything shaped like a secret. Scanned locally, nothing uploaded to check it. | ● on |
-| `command-guard` | Blocks `curl…\|bash`, edits to your shell startup files, and credentials being shipped out. An opt-in `CT_TRUSTED_BOOTSTRAP_URLS` allowlist can exempt specific installer-script URLs from the `curl\|bash` block (see [Configuring the opt-in env keys](#configuring-the-opt-in-env-keys) below). | ● on |
-| `mcp-guard` | Applies your MCP server allow/deny lists (`CT_MCP_ALLOW` / `CT_MCP_DENY`) and blocks MCP tool inputs carrying anything shaped like a secret. It runs on every MCP call, so it checks key shapes and your org markers only; trufflehog stays on the Bash and web egress guards, for latency. The plugin install scans only; the lists come with the full kit. | ● on |
-| `post-guard` | Redacts anything shaped like a secret from what a file read, a web fetch, a web search, or an MCP tool call returns, rewriting the output before the model sees it — a PostToolUse hook, so it rewrites rather than blocks. Also warns, via Claude Code's `systemMessage` channel and to the model itself as additional context (never blocks), when fetched, searched, or MCP-returned content carries a prompt-injection phrase like "ignore previous instructions". An MCP resource block's own text is scanned like any other text; only image data and a resource's binary blob field are never scanned. | ● on |
-| `prompt-guard` | Scans what YOU just typed, not a tool call: prompt-injection phrasing, a credential paired with a send/upload instruction, and encoded blobs that decode to a shell command. Warns only — never blocks, never edits your prompt, never adds anything to the model's context. | ○ opt-in |
-| `rtk-safe` | Compresses supported standalone commands, including `grep`/`rg`. Native flags, exit codes and regex dialect are preserved, but long result sets are **summarized**: you get the first ~25 matches plus an exact count of what was hidden and a `rtk recall` handle to retrieve it. Requires stable [`rtk`](https://github.com/rtk-ai/rtk) ≥ 0.49.0; otherwise leaves commands unchanged. Leaves `head`, `-h`/`--help`, and anything with a shell operator or substitution untouched, and preserves project scripts and interpreter selection. `rg`'s auto-approval requires `command-guard`. | ● on |
-| `statusline` | A status bar with live context-fill and rate-limit gauges. | ● on |
-| `shell-audit` | On-demand, read-only scan of your shell startup for hardcoded creds, risky hooks, and stale aliases. | ● on |
-| `wrap-up` | A `/wrap-up` command that summarizes, verifies, and stages a commit for review. Never commits on its own. | ○ opt-in |
-| `secure-deep-research` | Privacy-aware web research with per-claim adversarial verification before a cited synthesis. Sensitive topics are gated and routed through your own search instance. | ○ opt-in |
-| `harness-pointer` | A small nudge pointing the agent at the right CLI for your environment. Ships empty. | ○ opt-in |
-| `notify-osc` | A desktop notification when it's genuinely your turn — stays quiet while a background task (agent or shell) is still running. Auto-detects your terminal (Ghostty, kitty, WezTerm, iTerm2); works over SSH. | ○ opt-in |
-| `error-reporting-off` | Sets `DISABLE_ERROR_REPORTING` to opt out of Sentry error reporting. | ● on |
-| `feedback-off` | Sets `DISABLE_FEEDBACK_COMMAND` to disable the `/feedback` command. | ● on |
-| `feedback-survey-off` | Sets `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` to disable session quality surveys. | ● on |
-| `telemetry-off` | Sets `DISABLE_TELEMETRY`. Opt-in because it disables Remote Control (driving the CLI from a claude.ai session). | ○ opt-in |
-| `autoupdater-off` | Sets `DISABLE_AUTOUPDATER` to stop background updates; `claude update` still works. | ○ opt-in |
+| `secure-settings` | Denies reads of SSH keys, cloud creds, `.env`, keychains; blocks writes to shell startup files; no auto-loaded MCP servers. | on |
+| `sandbox` | Enables Claude Code's native OS-level sandbox, so Bash and every other tool run confined, not just the Read tool. Claude Code's own sandbox already merges `secure-settings`'s Read-deny credential paths into its filesystem restrictions at runtime, so this addition doesn't duplicate that list itself. While selected it owns `sandbox.enabled` (a manual edit back to `false` is warned about and set back to `true` on the next apply; deselect the addition to actually turn the sandbox off). Changes Bash behavior in every session; needs `bwrap` and `socat` on PATH on Linux (macOS always supported; skipped elsewhere with a notice). | opt-in |
+| `leak-guard` | Scans what the agent sends to the web and blocks anything shaped like a secret. Scanned locally, nothing uploaded to check it. | on |
+| `command-guard` | Blocks `curl…\|bash`, edits to your shell startup files, and credentials being shipped out. An opt-in `CT_TRUSTED_BOOTSTRAP_URLS` allowlist can exempt specific installer-script URLs from the `curl\|bash` block (see [Configuring the opt-in env keys](#configuring-the-opt-in-env-keys) below). | on |
+| `mcp-guard` | Applies your MCP server allow/deny lists (`CT_MCP_ALLOW` / `CT_MCP_DENY`) and blocks MCP tool inputs carrying anything shaped like a secret. It runs on every MCP call, so it checks key shapes and your org markers only; trufflehog stays on the Bash and web egress guards, for latency. The plugin install scans only; the lists come with the full kit. | on |
+| `post-guard` | Redacts anything shaped like a secret from what a file read, a web fetch, a web search, or an MCP tool call returns, rewriting the output before the model sees it — a PostToolUse hook, so it rewrites rather than blocks. Also warns, via Claude Code's `systemMessage` channel and to the model itself as additional context (never blocks), when fetched, searched, or MCP-returned content carries a prompt-injection phrase like "ignore previous instructions". An MCP resource block's own text is scanned like any other text; only image data and a resource's binary blob field are never scanned. | on |
+| `prompt-guard` | Scans what YOU just typed, not a tool call: prompt-injection phrasing, a credential paired with a send/upload instruction, and encoded blobs that decode to a shell command. Warns only — never blocks, never edits your prompt, never adds anything to the model's context. | opt-in |
+| `rtk-safe` | Compresses supported standalone commands, including `grep`/`rg`. Native flags, exit codes and regex dialect are preserved, but long result sets are **summarized**: you get the first ~25 matches plus an exact count of what was hidden and a `rtk recall` handle to retrieve it. Requires stable [`rtk`](https://github.com/rtk-ai/rtk) ≥ 0.49.0; otherwise leaves commands unchanged. Leaves `head`, `-h`/`--help`, and anything with a shell operator or substitution untouched, and preserves project scripts and interpreter selection. `rg`'s auto-approval requires `command-guard`. | on |
+| `statusline` | A status bar with live context-fill and rate-limit gauges. | on |
+| `shell-audit` | On-demand, read-only scan of your shell startup for hardcoded creds, risky hooks, and stale aliases. | on |
+| `wrap-up` | A `/wrap-up` command that summarizes, verifies, and stages a commit for review. Never commits on its own. | opt-in |
+| `secure-deep-research` | Privacy-aware web research with per-claim adversarial verification before a cited synthesis. Sensitive topics are gated and routed through your own search instance. | opt-in |
+| `harness-pointer` | A small nudge pointing the agent at the right CLI for your environment. Ships empty. | opt-in |
+| `notify-osc` | A desktop notification when it's genuinely your turn — stays quiet while a background task (agent or shell) is still running. Auto-detects your terminal (Ghostty, kitty, WezTerm, iTerm2); works over SSH. | opt-in |
+| `error-reporting-off` | Sets `DISABLE_ERROR_REPORTING` to opt out of Sentry error reporting. | on |
+| `feedback-off` | Sets `DISABLE_FEEDBACK_COMMAND` to disable the `/feedback` command. | on |
+| `feedback-survey-off` | Sets `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` to disable session quality surveys. | on |
+| `telemetry-off` | Sets `DISABLE_TELEMETRY`. Opt-in because it disables Remote Control (driving the CLI from a claude.ai session). | opt-in |
+| `autoupdater-off` | Sets `DISABLE_AUTOUPDATER` to stop background updates; `claude update` still works. | opt-in |
 
 `statusline` also has its own opt-in **sidecar**: set `CLAUDE_TOOLS_STATUS_SIDECAR_DIR` and it
 writes `<dir>/<session_id>.json` with the session's context-window usage, model, and cwd — plus Claude Code's rate-limit windows (`rate_limits`: five-hour and seven-day usage and reset time) when it supplies them — fields
