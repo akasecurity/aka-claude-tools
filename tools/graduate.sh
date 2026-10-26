@@ -75,4 +75,4 @@ ok "identity + leak guards clean"
 
 echo; echo "review:  git -C $PUBLIC log --oneline origin/main..HEAD"
 echo "push:    git -C $PUBLIC push -u origin $BRANCH"
-echo "then open a PR:  https://github.com/akasecurity/claude-tools/compare/main...$BRANCH?expand=1"
+echo "then open a PR:  https://github.com/akasecurity/aka-claude-tools/compare/main...$BRANCH?expand=1"

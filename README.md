@@ -13,7 +13,7 @@
 <h3 align="center">The clean slate a fresh Claude Code should start from.</h3>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/github/v/tag/akasecurity/claude-tools?label=version&color=blue">
+  <img alt="version" src="https://img.shields.io/github/v/tag/akasecurity/aka-claude-tools?label=version&color=blue">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-green">
 </p>
 
@@ -25,7 +25,7 @@ New to this? Hand the repo to Claude and it sets you up. Comfortable in a termin
 Read every hook first. It's all plain shell and TypeScript, MIT, and the guards scan
 locally: nothing is uploaded to run them.
 
-> Also known as `aka-claude-tools` (the npm package, Homebrew formula, and CLI name). Repo: `akasecurity/claude-tools`. The guard-hooks plugin installs as `aka-claude-tools@akasecurity`.
+> Also known as `aka-claude-tools` (the Homebrew formula and CLI name; the npm package is `@akasecurity/claude-tools`). Repo: `akasecurity/aka-claude-tools`. The guard-hooks plugin installs as `aka-claude-tools@akasecurity`.
 
 From [akasecurity](https://akasecurity.io) · MIT · needs `jq` + `bun`.
 
@@ -60,7 +60,7 @@ namespace: its git-style dispatcher makes `aka claude` launch this profile.
 
 **Hand it to Claude.** In a logged-in Claude Code session, say:
 
-> Set up aka-claude-tools from github.com/akasecurity/claude-tools.
+> Set up aka-claude-tools from github.com/akasecurity/aka-claude-tools.
 > Read its agent-install.md and set up a hardened profile for me.
 
 It reads the guide, checks what you already have, migrates it cleanly, and runs the
@@ -93,8 +93,8 @@ exists.
 **Or clone and run:**
 
 ```bash
-git clone git@github.com:akasecurity/claude-tools.git
-cd claude-tools
+git clone git@github.com:akasecurity/aka-claude-tools.git
+cd aka-claude-tools
 ./install.sh             # interactive
 ./install.sh --defaults  # accept the recommended ten
 ./install.sh --help      # every flag and env var; changes nothing
