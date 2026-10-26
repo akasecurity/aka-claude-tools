@@ -21,6 +21,9 @@ if [ -z "$bun_bin" ]; then
   printf '[aka-claude-tools] guard INACTIVE: bun not found — this tool is NOT being scanned. Install bun (https://bun.sh) to activate the guard.\n' >&2
   exit 0   # FAIL OPEN — never block
 fi
+# The guards read the session's directory from the hook input, never from their own working
+# directory, so start bun from / : bun's start-up slows with a very large working directory.
+cd / 2>/dev/null || :
 # Optional resident hook client: CT_HOOK_CLIENT (an absolute path to an executable) answers the hook
 # itself, keeping the guard loaded between calls, and runs `bun <guard>` when it cannot. Called as
 #   $CT_HOOK_CLIENT <guard name> <bun> <guard>   (guard name = the script's file name without .ts)

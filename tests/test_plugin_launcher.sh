@@ -37,4 +37,9 @@ for c in client "$tmp/missing" "$tmp/noexec" ""; do
   [[ "$out" == 'RAN /g.ts <{}>' && $rc -eq 5 ]] || { echo "FAIL case6 ($c): '$out' rc=$rc"; fails=1; }
 done
 
+# CASE 7: the guard runs from /, whatever the caller's working directory
+printf '#!/usr/bin/env sh\npwd\n' > "$tmp/pwdbun"; mkdir -p "$tmp/pb"; cp "$tmp/pwdbun" "$tmp/pb/bun"; chmod +x "$tmp/pb/bun"
+out="$(cd "$tmp" && printf '{}' | PATH="$tmp/pb:$PATH" "$OLDPWD/$L" /g.ts)"
+[[ "$out" == "/" ]] || { echo "FAIL case7: guard cwd '$out'"; fails=1; }
+
 [ "$fails" -eq 0 ] && echo "PASS test_plugin_launcher" || exit 1
