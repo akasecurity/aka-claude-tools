@@ -8,6 +8,14 @@ Pre-1.0: minor versions may carry breaking changes; they are called out below.
 
 ## [Unreleased]
 
+### Security
+- **The guard hooks no longer take their profile from `CLAUDE_CONFIG_DIR`.** Whether ai-tc is installed (which turns
+  off some of the guards' own secret scans) and where the audit log is written were decided from `CLAUDE_CONFIG_DIR`
+  first. Environment set by a project's settings reaches hooks, so pointing it at a directory that only looked like an
+  ai-tc profile switched the scans off. Each hook now derives its profile from its own file location
+  (`<profile>/hooks/` or `<profile>/plugins/cache/…/hooks/`); from any other location ai-tc counts as absent and every
+  scan runs. The SessionStart integrity check resolves its profile the same way.
+
 ## [0.5.4] leak-guard covers every SearXNG MCP tool
 
 ### Fixed

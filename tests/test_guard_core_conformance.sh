@@ -40,16 +40,15 @@ build_path_no_trufflehog() {
 }
 PATH_CLEAN="$(build_path_no_trufflehog)"
 
-# A sandbox copy of the real hooks — never run against the repo's own config/hooks.
-hooks="$tmp/hooks"; cp -R config/hooks "$hooks"
-
 # Two sandbox profiles: bare (no ai-tc) and ai-tc stubbed in (registry + enabled + cache dir).
-bare="$tmp/bare"; mkdir -p "$bare"
-aitc="$tmp/aitc"; mkdir -p "$aitc/plugins/cache/akasecurity/ai-tc/1"
+# A hook derives its profile from its own path, so each profile gets a sandbox copy of the
+# real hooks under <profile>/hooks/ — never run against the repo's own config/hooks.
+bare="$tmp/bare"; mkdir -p "$bare"; cp -R config/hooks "$bare/hooks"
+aitc="$tmp/aitc"; mkdir -p "$aitc/plugins/cache/akasecurity/ai-tc/1"; cp -R config/hooks "$aitc/hooks"
 printf '%s' '{"plugins":{"ai-tc@akasecurity":[{}]}}' > "$aitc/plugins/installed_plugins.json"
 printf '%s' '{"enabledPlugins":{"ai-tc@akasecurity":true}}' > "$aitc/settings.json"
-# A decoy HOME with no .claude of its own — every case passes CLAUDE_CONFIG_DIR explicitly,
-# so a case that silently fell back to $HOME/.claude instead would show up as a real failure.
+# A decoy HOME with no .claude of its own, so a case that silently fell back to
+# $HOME/.claude instead of the hook's own profile would show up as a real failure.
 decoy_home="$tmp/decoy-home"; mkdir -p "$decoy_home"
 
 have_rtk=0
@@ -76,6 +75,7 @@ for ((i = 0; i < n; i++)); do
 
   profile="$bare"
   [ "$aitc_ctx" = "true" ] && profile="$aitc"
+  hooks="$profile/hooks"
 
   path="$PATH"
   [ "$scanner" = "clean" ] && path="$PATH_CLEAN"
@@ -101,7 +101,7 @@ for ((i = 0; i < n; i++)); do
     fi
     set +e
     printf '%s' "$hook_input" \
-      | CLAUDE_CONFIG_DIR="$profile" HOME="$decoy_home" PATH="$path" bun "$hooks/mcp-guard.ts" \
+      | HOME="$decoy_home" PATH="$path" bun "$hooks/mcp-guard.ts" \
       >"$tmp/mg.out" 2>"$tmp/mg.err"
     mg_exit=$?
     set -e
@@ -109,7 +109,7 @@ for ((i = 0; i < n; i++)); do
   elif [ "$surface" = "bash" ]; then
     set +e
     printf '%s' "$hook_input" \
-      | CLAUDE_CONFIG_DIR="$profile" HOME="$decoy_home" PATH="$path" bun "$hooks/command-guard.ts" \
+      | HOME="$decoy_home" PATH="$path" bun "$hooks/command-guard.ts" \
       >"$tmp/cg.out" 2>"$tmp/cg.err"
     cg_exit=$?
     set -e
@@ -118,14 +118,14 @@ for ((i = 0; i < n; i++)); do
     else
       set +e
       rtk_out="$(printf '%s' "$hook_input" \
-        | CLAUDE_CONFIG_DIR="$profile" HOME="$decoy_home" PATH="$path" bun "$hooks/rtk-safe.ts" 2>"$tmp/rtk.err")"
+        | HOME="$decoy_home" PATH="$path" bun "$hooks/rtk-safe.ts" 2>"$tmp/rtk.err")"
       set -e
       if grep -q updatedInput <<<"$rtk_out"; then outcome=rewrite; else outcome=allow; fi
     fi
   else
     set +e
     printf '%s' "$hook_input" \
-      | CLAUDE_CONFIG_DIR="$profile" HOME="$decoy_home" PATH="$path" bun "$hooks/leak-guard.ts" \
+      | HOME="$decoy_home" PATH="$path" bun "$hooks/leak-guard.ts" \
       >"$tmp/lg.out" 2>"$tmp/lg.err"
     lg_exit=$?
     set -e

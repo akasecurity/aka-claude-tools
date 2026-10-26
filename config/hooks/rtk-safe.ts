@@ -35,7 +35,7 @@
 import { readFileSync } from 'fs';
 import { spawnSync } from 'child_process';
 import { rewrite, supportedVersion, detectAitc, coexistencePolicy } from './lib/guard-core.js';
-import { dirname, isAbsolute, join } from 'path';
+import { dirname, isAbsolute } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
 export { rewrite, supportedVersion };
@@ -52,13 +52,18 @@ function projectOpt(input: { cwd?: unknown }): { projectDir?: string } {
   return typeof input.cwd === 'string' && isAbsolute(input.cwd) ? { projectDir: input.cwd } : {};
 }
 
-// The profile this session runs in: ai-tc only counts if its hooks run here too.
+// The profile this hook belongs to: ai-tc only counts if its hooks run there too. Derived
+// from this file's own location only, never from the environment, so a session's env
+// cannot point ai-tc detection at another directory:
+//   <profile>/hooks/<file>                                              -> [<profile>]
+//   <profile>/plugins/cache/<marketplace>/<name>/<version>/hooks/<file> -> [<profile>]
+// Any other location yields no root, which detectAitc reads as "ai-tc absent".
 function profileRoots(): string[] {
-  const env = process.env.CLAUDE_CONFIG_DIR;
-  if (env && env.startsWith('/')) return [env];
   const hooksDir = dirname(fileURLToPath(import.meta.url));
+  const cached = /^(\/.+)\/plugins\/cache\/[^/]+\/[^/]+\/[^/]+\/hooks$/.exec(hooksDir);
+  if (cached) return [cached[1]];
   if (hooksDir.endsWith('/hooks') && !hooksDir.includes('/plugins/')) return [dirname(hooksDir)];
-  return [join(homedir(), '.claude')];
+  return [];
 }
 
 // ai-tc detection only ever turns rewriting off; if it throws, treat ai-tc as present and

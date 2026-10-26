@@ -21,7 +21,8 @@
 #      off, is settings drift, and --audit names the missing registration
 #   L. a launcher shim written by --alias is recorded (and dropped again by
 #      --delete-alias); editing it is drift
-#   M. a trailing slash on CLAUDE_CONFIG_DIR is not settings drift
+#   M. a trailing slash on CLAUDE_CONFIG_DIR is not settings drift, and
+#      CLAUDE_CONFIG_DIR naming another directory does not silence drift
 #   N. --alias/--delete-alias for one name re-records only that shim, never an
 #      edited shim of another name
 #   O. --audit warns on disableAllHooks and bypassPermissions without counting
@@ -201,6 +202,15 @@ else fail "M. CLAUDE_CONFIG_DIR with two trailing slashes → still clean" "err=
 settings_edit '.permissions.deny -= ["Read(~/.aws/**)"]'
 CLAUDE_CONFIG_DIR="$DIR/" HOME="$SB" bun "$DIR/hooks/integrity-check.ts" </dev/null >"$SB/out" 2>"$SB/err"
 assert_eq "M. trailing slash still reports real settings drift" "$NOTICE_SET" "$(cat "$SB/err")"
+inst
+# The profile comes from the hook's own path: CLAUDE_CONFIG_DIR naming another directory
+# (here an empty one with no meta) neither silences real drift nor moves the check there.
+mkdir -p "$SB/elsewhere"
+printf '// edited\n' >> "$DIR/hooks/command-guard.ts"
+CLAUDE_CONFIG_DIR="$SB/elsewhere" HOME="$SB" bun "$DIR/hooks/integrity-check.ts" </dev/null >"$SB/out" 2>"$SB/err"
+M_RC=$?
+if [ "$M_RC" = "2" ] && [ "$(cat "$SB/err")" = "$NOTICE_FILE" ]; then pass "M. CLAUDE_CONFIG_DIR naming another directory → drift still reported"
+else fail "M. CLAUDE_CONFIG_DIR naming another directory → drift still reported" "rc=$M_RC err=$(cat "$SB/err")"; fi
 inst
 
 # ── N. a shim update records only that shim ──────────────────────────────────

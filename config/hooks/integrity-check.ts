@@ -57,16 +57,23 @@ export function notice(changedFiles: number, settingsDrift: boolean): string {
     + `${settingsDrift ? 'settings drift' : 'settings OK'}; run aka-claude-tools --audit`;
 }
 
-// The profile this session runs in. Same resolution as the other kit hooks, plus trailing
-// slashes stripped: the installer records the profile without one, and a "<dir>/" spelling
-// would otherwise turn every "<dir>/hooks/<file>" needle into "<dir>//hooks/<file>" and
-// report every kit hook registration as settings drift.
+// The profile this hook belongs to, derived from this file's own location
+// (<profile>/hooks/<file>) and never from the environment, so a session's env cannot point
+// the check at another directory and silence it. Any other location yields no root.
+// CLAUDE_CONFIG_DIR is used only as a SPELLING of that same directory: the installer
+// records hook commands under the profile path as the user named it, while this file's
+// own path is symlink-resolved, so when the env value resolves to the derived directory it
+// is used as given (trailing slashes stripped, since a "<dir>/" spelling would turn every
+// "<dir>/hooks/<file>" needle into "<dir>//hooks/<file>" and read as settings drift).
 function profileRoots(): string[] {
-  const env = process.env.CLAUDE_CONFIG_DIR;
-  if (env && env.startsWith('/')) return [env.replace(/\/+$/, '') || '/'];
   const hooksDir = dirname(fileURLToPath(import.meta.url));
-  if (hooksDir.endsWith('/hooks') && !hooksDir.includes('/plugins/')) return [dirname(hooksDir)];
-  return [join(homedir(), '.claude')];
+  if (!hooksDir.endsWith('/hooks') || hooksDir.includes('/plugins/')) return [];
+  const root = dirname(hooksDir);
+  const env = process.env.CLAUDE_CONFIG_DIR?.replace(/\/+$/, '');
+  if (env && env.startsWith('/')) {
+    try { if (realpathSync(env) === realpathSync(root)) return [env]; } catch { /* use the derived root */ }
+  }
+  return [root];
 }
 
 // A plugin copy has no manifest of its own to check, and must never report against a
@@ -139,6 +146,19 @@ export function settingsDrift(root: string, m: Manifest): boolean | null {
   try { settings = readFileSync(join(root, 'settings.json'), 'utf-8'); } catch { settings = '{}'; }
   const roots = [root];
   try { const real = realpathSync(root); if (!roots.includes(real)) roots.push(real); } catch { /* keep as given */ }
+  // The root may be symlink-resolved while the installer wrote hook commands under $HOME as
+  // given; add the $HOME spelling of a root that lies under the resolved $HOME. More
+  // spellings only widen which registrations count as the kit's, never hide drift.
+  try {
+    const home = homedir();
+    const realHome = realpathSync(home);
+    for (const r of [...roots]) {
+      if (realHome !== home && (r === realHome || r.startsWith(`${realHome}/`))) {
+        const spelled = home.replace(/\/+$/, '') + r.slice(realHome.length);
+        if (!roots.includes(spelled)) roots.push(spelled);
+      }
+    }
+  } catch { /* keep the spellings found so far */ }
   const r = Bun.spawnSync([
     jq, '-S', '-c',
     '--argjson', 'm', JSON.stringify({ files: m.files, kit: m.kit ?? {} }),
