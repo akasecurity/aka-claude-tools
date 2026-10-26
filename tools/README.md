@@ -55,7 +55,7 @@ review, and test them.
   workflow runs it **manually** (`workflow_dispatch`) with a scoped GitHub App token,
   keeping a human on the irreversible public push.
   ```bash
-  DRY_RUN=1 PUB_URL=git@github.com:akasecurity/claude-tools.git tools/sync-public.sh
+  DRY_RUN=1 PUB_URL=git@github.com:akasecurity/aka-claude-tools.git tools/sync-public.sh
   ```
 
 Both default the repo to the clone they live in and are fully overridable by env
