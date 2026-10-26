@@ -25,21 +25,47 @@ err="$(printf '{}' | env -i HOME="$tmp/none" PATH=/usr/bin:/bin AKA_BUN_CANDIDAT
 printf '{}' | "$L" >/dev/null 2>&1; rc=$?
 [[ $rc -eq 0 ]] || { echo "FAIL case4: zero-arg must fail-open (exit 0) got rc=$rc"; fails=1; }
 
-# CASE 5: CT_HOOK_CLIENT set to an executable -> the client gets <name> <bun> <guard> and the stdin
-printf '#!/usr/bin/env sh\necho "CLIENT $1 $2 $3 <$(cat)>"; exit 7\n' > "$tmp/client"; chmod +x "$tmp/client"
-out="$(printf '{"t":2}' | PATH="$tmp:$PATH" CT_HOOK_CLIENT="$tmp/client" "$L" /x/command-guard.ts)"; rc=$?
+# CASE 5: a client named in the user's aka-claude-tools.config -> command-guard goes to it with
+# <name> <bun> <guard> and the stdin; its exit status is the hook's
+printf '#!/usr/bin/env sh\necho "CLIENT $1 $2 $3 <$(cat)>"; exit 7\n' > "$tmp/client"; chmod 700 "$tmp/client"
+mkdir -p "$tmp/cfg"; printf 'CT_HOOK_CLIENT="%s"\n' "$tmp/client" > "$tmp/cfg/aka-claude-tools.config"; chmod 600 "$tmp/cfg/aka-claude-tools.config"
+out="$(printf '{"t":2}' | PATH="$tmp:$PATH" CLAUDE_CONFIG_DIR="$tmp/cfg" "$L" /x/command-guard.ts)"; rc=$?
 [[ "$out" == "CLIENT command-guard $tmp/bun /x/command-guard.ts <{\"t\":2}>" && $rc -eq 7 ]] || { echo "FAIL case5: '$out' rc=$rc"; fails=1; }
 
-# CASE 6: CT_HOOK_CLIENT relative, missing or not executable -> bun runs the guard as before
-printf 'echo no\n' > "$tmp/noexec"
-for c in client "$tmp/missing" "$tmp/noexec" ""; do
-  out="$(cd "$tmp" && printf '{}' | PATH="$tmp:$PATH" CT_HOOK_CLIENT="$c" "$OLDPWD/$L" /g.ts)"; rc=$?
-  [[ "$out" == 'RAN /g.ts <{}>' && $rc -eq 5 ]] || { echo "FAIL case6 ($c): '$out' rc=$rc"; fails=1; }
+# CASE 6: the client is never taken from the environment: CT_HOOK_CLIENT=/usr/bin/true (or our own
+# client) in the env must not skip any guard
+for c in /usr/bin/true "$tmp/client"; do
+  for g in /x/command-guard.ts /x/leak-guard.ts; do
+    out="$(printf '{}' | PATH="$tmp:$PATH" CLAUDE_CONFIG_DIR="$tmp/nocfg" CT_HOOK_CLIENT="$c" "$L" "$g")"; rc=$?
+    [[ "$out" == "RAN $g <{}>" && $rc -eq 5 ]] || { echo "FAIL case6 (env $c, $g): '$out' rc=$rc"; fails=1; }
+  done
 done
 
-# CASE 7: the guard runs from /, whatever the caller's working directory
+# CASE 7: only command-guard is handed to the client; every other guard runs under bun
+out="$(printf '{}' | PATH="$tmp:$PATH" CLAUDE_CONFIG_DIR="$tmp/cfg" "$L" /x/leak-guard.ts)"; rc=$?
+[[ "$out" == 'RAN /x/leak-guard.ts <{}>' && $rc -eq 5 ]] || { echo "FAIL case7: '$out' rc=$rc"; fails=1; }
+
+# CASE 8: a config client that is relative, missing, not executable, not owned by this user
+# (/usr/bin/true), or group/world-writable -> bun runs the guard
+printf 'echo no\n' > "$tmp/noexec"; chmod 600 "$tmp/noexec"
+cp "$tmp/client" "$tmp/gw"; chmod 770 "$tmp/gw"; cp "$tmp/client" "$tmp/ow"; chmod 707 "$tmp/ow"
+for c in client "$tmp/missing" "$tmp/noexec" /usr/bin/true "$tmp/gw" "$tmp/ow" ""; do
+  printf 'CT_HOOK_CLIENT=%s\n' "$c" > "$tmp/cfg/aka-claude-tools.config"
+  out="$(printf '{}' | PATH="$tmp:$PATH" CLAUDE_CONFIG_DIR="$tmp/cfg" "$L" /x/command-guard.ts)"; rc=$?
+  [[ "$out" == 'RAN /x/command-guard.ts <{}>' && $rc -eq 5 ]] || { echo "FAIL case8 ($c): '$out' rc=$rc"; fails=1; }
+done
+
+# CASE 9: a group- or world-writable config is ignored, even when it names a good client
+printf 'CT_HOOK_CLIENT=%s\n' "$tmp/client" > "$tmp/cfg/aka-claude-tools.config"
+for m in 620 602; do
+  chmod "$m" "$tmp/cfg/aka-claude-tools.config"
+  out="$(printf '{}' | PATH="$tmp:$PATH" CLAUDE_CONFIG_DIR="$tmp/cfg" "$L" /x/command-guard.ts)"; rc=$?
+  [[ "$out" == 'RAN /x/command-guard.ts <{}>' && $rc -eq 5 ]] || { echo "FAIL case9 ($m): '$out' rc=$rc"; fails=1; }
+done
+
+# CASE 10: the guard runs from /, whatever the caller's working directory
 printf '#!/usr/bin/env sh\npwd\n' > "$tmp/pwdbun"; mkdir -p "$tmp/pb"; cp "$tmp/pwdbun" "$tmp/pb/bun"; chmod +x "$tmp/pb/bun"
 out="$(cd "$tmp" && printf '{}' | PATH="$tmp/pb:$PATH" "$OLDPWD/$L" /g.ts)"
-[[ "$out" == "/" ]] || { echo "FAIL case7: guard cwd '$out'"; fails=1; }
+[[ "$out" == "/" ]] || { echo "FAIL case10: guard cwd '$out'"; fails=1; }
 
 [ "$fails" -eq 0 ] && echo "PASS test_plugin_launcher" || exit 1
