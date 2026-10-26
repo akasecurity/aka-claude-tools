@@ -137,7 +137,7 @@ A guard you haven't watched fire is one you're only assuming works. Launch the p
 
 ## What's inside
 
-<p align="center"><img src="media/whats-inside.svg" alt="What's inside: additions grouped by what they do (graphic not yet refreshed for this release's count)." width="100%"></p>
+<p align="center"><img src="media/whats-inside.svg" alt="What's inside: additions grouped by what they do." width="100%"></p>
 
 Nineteen additions; the menu is driven entirely by
 [`config/additions.json`](config/additions.json), the single source both install paths read.
