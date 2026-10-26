@@ -8,7 +8,7 @@ Two kinds of asset, deliberately kept separate so updates stay cheap:
 
 ### Diagrams & mockups — `*.svg` (authored here, low-churn)
 
-`banner.svg`, `isolated-profile.svg`, `whats-inside.svg`, and the
+`isolated-profile.svg`, `whats-inside.svg`, and the
 `control-*.svg` terminal mockups are **hand-authored SVG that lives in this
 repo**. They are text, so they diff cleanly, version with the code, and never
 drift from a deck in another repo. Edit them directly.
