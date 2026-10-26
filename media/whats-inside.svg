@@ -10,8 +10,8 @@
     <g transform="translate(0,140)">
       <text x="60" y="38" font-size="20" font-weight="700" fill="#F6F8F9">Clean context</text>
       <text x="60" y="63" font-size="15" fill="#6B7D8F">keep the model's memory for the work</text>
-      <g transform="translate(360,21)"><rect width="142" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><circle cx="24" cy="22" r="6" fill="#00E0B8"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">rtk-safe</text></g>
-      <g transform="translate(518,21)"><rect width="160" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><circle cx="24" cy="22" r="6" fill="#00E0B8"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">statusline</text></g>
+      <g transform="translate(360,21)"><rect width="118" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">rtk-safe</text></g>
+      <g transform="translate(494,21)"><rect width="136" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">statusline</text></g>
     </g>
     <line x1="60" y1="226" x2="1140" y2="226" stroke="#FFFFFF" stroke-opacity="0.06"/>
 
@@ -19,7 +19,7 @@
     <g transform="translate(0,226)">
       <text x="60" y="38" font-size="20" font-weight="700" fill="#F6F8F9">Locked doors</text>
       <text x="60" y="63" font-size="15" fill="#6B7D8F">safe defaults from day one</text>
-      <g transform="translate(360,21)"><rect width="206" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><circle cx="24" cy="22" r="6" fill="#00E0B8"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">secure-settings</text></g>
+      <g transform="translate(360,21)"><rect width="182" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">secure-settings</text></g>
     </g>
     <line x1="60" y1="312" x2="1140" y2="312" stroke="#FFFFFF" stroke-opacity="0.06"/>
 
@@ -27,8 +27,8 @@
     <g transform="translate(0,312)">
       <text x="60" y="38" font-size="20" font-weight="700" fill="#F6F8F9">Guarded exits</text>
       <text x="60" y="63" font-size="15" fill="#6B7D8F">watch what leaves, and what runs</text>
-      <g transform="translate(360,21)"><rect width="160" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><circle cx="24" cy="22" r="6" fill="#00E0B8"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">leak-guard</text></g>
-      <g transform="translate(536,21)"><rect width="188" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><circle cx="24" cy="22" r="6" fill="#00E0B8"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">command-guard</text></g>
+      <g transform="translate(360,21)"><rect width="136" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">leak-guard</text></g>
+      <g transform="translate(512,21)"><rect width="164" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">command-guard</text></g>
     </g>
     <line x1="60" y1="398" x2="1140" y2="398" stroke="#FFFFFF" stroke-opacity="0.06"/>
 
@@ -36,11 +36,11 @@
     <g transform="translate(0,398)">
       <text x="60" y="38" font-size="20" font-weight="700" fill="#F6F8F9">Quieter by default</text>
       <text x="60" y="63" font-size="15" fill="#6B7D8F">trim nonessential traffic</text>
-      <g transform="translate(360,14)"><rect width="232" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><circle cx="24" cy="22" r="6" fill="#00E0B8"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">error-reporting-off</text></g>
-      <g transform="translate(608,14)"><rect width="168" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><circle cx="24" cy="22" r="6" fill="#00E0B8"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">feedback-off</text></g>
-      <g transform="translate(792,14)"><rect width="240" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><circle cx="24" cy="22" r="6" fill="#00E0B8"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">feedback-survey-off</text></g>
-      <g transform="translate(360,70)"><rect width="178" height="44" rx="10" fill="#232F3E" stroke="#8A98FF" stroke-opacity="0.5"/><circle cx="24" cy="22" r="6" fill="none" stroke="#8A98FF" stroke-width="2"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#C3CBFF">telemetry-off</text></g>
-      <g transform="translate(554,70)"><rect width="196" height="44" rx="10" fill="#232F3E" stroke="#8A98FF" stroke-opacity="0.5"/><circle cx="24" cy="22" r="6" fill="none" stroke="#8A98FF" stroke-width="2"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#C3CBFF">autoupdater-off</text></g>
+      <g transform="translate(360,14)"><rect width="208" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">error-reporting-off</text></g>
+      <g transform="translate(584,14)"><rect width="144" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">feedback-off</text></g>
+      <g transform="translate(744,14)"><rect width="216" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">feedback-survey-off</text></g>
+      <g transform="translate(360,70)"><rect width="154" height="44" rx="10" fill="#232F3E" stroke="#8A98FF" stroke-opacity="0.5"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#C3CBFF">telemetry-off</text></g>
+      <g transform="translate(530,70)"><rect width="172" height="44" rx="10" fill="#232F3E" stroke="#8A98FF" stroke-opacity="0.5"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#C3CBFF">autoupdater-off</text></g>
     </g>
     <line x1="60" y1="534" x2="1140" y2="534" stroke="#FFFFFF" stroke-opacity="0.06"/>
 
@@ -48,8 +48,8 @@
     <g transform="translate(0,534)">
       <text x="60" y="38" font-size="20" font-weight="700" fill="#F6F8F9">Verify &amp; hand off</text>
       <text x="60" y="63" font-size="15" fill="#6B7D8F">check the work before it ships</text>
-      <g transform="translate(360,21)"><rect width="170" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><circle cx="24" cy="22" r="6" fill="#00E0B8"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">shell-audit</text></g>
-      <g transform="translate(546,21)"><rect width="142" height="44" rx="10" fill="#232F3E" stroke="#8A98FF" stroke-opacity="0.5"/><circle cx="24" cy="22" r="6" fill="none" stroke="#8A98FF" stroke-width="2"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#C3CBFF">/wrap-up</text></g>
+      <g transform="translate(360,21)"><rect width="146" height="44" rx="10" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#CEFCF4">shell-audit</text></g>
+      <g transform="translate(522,21)"><rect width="118" height="44" rx="10" fill="#232F3E" stroke="#8A98FF" stroke-opacity="0.5"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#C3CBFF">/wrap-up</text></g>
     </g>
     <line x1="60" y1="620" x2="1140" y2="620" stroke="#FFFFFF" stroke-opacity="0.06"/>
 
@@ -57,16 +57,16 @@
     <g transform="translate(0,620)">
       <text x="60" y="38" font-size="20" font-weight="700" fill="#F6F8F9">Optional extras</text>
       <text x="60" y="63" font-size="15" fill="#6B7D8F">off until you want them</text>
-      <g transform="translate(360,21)"><rect width="252" height="44" rx="10" fill="#232F3E" stroke="#8A98FF" stroke-opacity="0.5"/><circle cx="24" cy="22" r="6" fill="none" stroke="#8A98FF" stroke-width="2"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#C3CBFF">secure-deep-research</text></g>
-      <g transform="translate(628,21)"><rect width="196" height="44" rx="10" fill="#232F3E" stroke="#8A98FF" stroke-opacity="0.5"/><circle cx="24" cy="22" r="6" fill="none" stroke="#8A98FF" stroke-width="2"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#C3CBFF">secure-research</text></g>
-      <g transform="translate(840,21)"><rect width="206" height="44" rx="10" fill="#232F3E" stroke="#8A98FF" stroke-opacity="0.5"/><circle cx="24" cy="22" r="6" fill="none" stroke="#8A98FF" stroke-width="2"/><text x="42" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#C3CBFF">harness-pointer</text></g>
+      <g transform="translate(360,21)"><rect width="228" height="44" rx="10" fill="#232F3E" stroke="#8A98FF" stroke-opacity="0.5"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#C3CBFF">secure-deep-research</text></g>
+      <g transform="translate(604,21)"><rect width="172" height="44" rx="10" fill="#232F3E" stroke="#8A98FF" stroke-opacity="0.5"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#C3CBFF">secure-research</text></g>
+      <g transform="translate(792,21)"><rect width="182" height="44" rx="10" fill="#232F3E" stroke="#8A98FF" stroke-opacity="0.5"/><text x="18" y="28" font-family="ui-monospace,'Geist Mono',monospace" fill="#C3CBFF">harness-pointer</text></g>
     </g>
   </g>
 
   <!-- legend -->
   <g transform="translate(60,760)" font-size="15">
-    <circle cx="8" cy="-4" r="6" fill="#00E0B8"/><text x="24" y="1" fill="#B0C7E2">on by default</text>
-    <circle cx="190" cy="-4" r="6" fill="none" stroke="#8A98FF" stroke-width="2"/><text x="206" y="1" fill="#B0C7E2">opt-in</text>
+    <rect x="0" y="-12" width="28" height="18" rx="5" fill="#232F3E" stroke="#00E0B8" stroke-opacity="0.45"/><text x="38" y="1" fill="#B0C7E2">on by default</text>
+    <rect x="190" y="-12" width="28" height="18" rx="5" fill="#232F3E" stroke="#8A98FF" stroke-opacity="0.5"/><text x="228" y="1" fill="#B0C7E2">opt-in</text>
     <text x="1080" y="1" text-anchor="end" font-family="ui-monospace,'Geist Mono',monospace" fill="#6B7D8F">each piece is independent</text>
   </g>
 </svg>
