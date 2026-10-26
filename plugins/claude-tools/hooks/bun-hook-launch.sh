@@ -21,4 +21,14 @@ if [ -z "$bun_bin" ]; then
   printf '[aka-claude-tools] guard INACTIVE: bun not found — this tool is NOT being scanned. Install bun (https://bun.sh) to activate the guard.\n' >&2
   exit 0   # FAIL OPEN — never block
 fi
+# Optional resident hook client: CT_HOOK_CLIENT (an absolute path to an executable) answers the hook
+# itself, keeping the guard loaded between calls, and runs `bun <guard>` when it cannot. Called as
+#   $CT_HOOK_CLIENT <guard name> <bun> <guard>   (guard name = the script's file name without .ts)
+# with the hook's stdin; its exit status and output are the hook's.
+case "${CT_HOOK_CLIENT:-}" in
+  /*) if [ -x "$CT_HOOK_CLIENT" ]; then
+        _name="${SCRIPT##*/}"
+        exec "$CT_HOOK_CLIENT" "${_name%.ts}" "$bun_bin" "$SCRIPT"
+      fi ;;
+esac
 exec "$bun_bin" "$SCRIPT"
