@@ -492,7 +492,7 @@ function coreUnavailable(command: string, say: Say): never {
   exit(0);
 }
 
-async function main(raw: string, env: HookEnv, say: Say): Promise<never> {
+async function main(raw: string, env: HookEnv, say: Say, seen: { command?: string }): Promise<never> {
   let input: HookInput | null | undefined;
   try { input = readInput(raw); } catch {
     // Fail open, but loudly — this is the sole Bash guard; surface the miss.
@@ -507,6 +507,7 @@ async function main(raw: string, env: HookEnv, say: Say): Promise<never> {
   const command = typeof input.tool_input === 'string'
     ? input.tool_input : (input.tool_input?.command as string | undefined) ?? '';
   if (!command) exit(0);
+  seen.command = command;
 
   let bad: string | null = null;
   try { bad = misorderedPkill(command); } catch { /* a parser bug must never block or crash the hook */ }
@@ -640,11 +641,18 @@ export async function run(raw: string, env: HookEnv): Promise<{ code: 0 | 2; std
   const lines: string[] = [];
   const say: Say = (line) => { lines.push(line); };
   let code: 0 | 2 = 0;
-  try { await main(raw, env, say); } catch (e) {
+  const seen: { command?: string } = {};
+  try { await main(raw, env, say, seen); } catch (e) {
     if (e instanceof Exit) code = e.code;
-    // Only an unexpected throw reaches here. Degrade loudly and allow (exit 0) rather than
-    // into bun's undefined non-zero exit.
-    else say(P + '⚠️ command-guard: unexpected error — allowed (surfaced, not silent). ' + String(e));
+    else if (seen.command === undefined) {
+      // An unexpected throw before the command is known: degrade loudly and allow (exit 0).
+      say(P + '⚠️ command-guard: unexpected error — allowed (surfaced, not silent). ' + String(e));
+    } else {
+      // An unexpected throw once the command is known: run the same conservative checks as a
+      // missing guard-core (structural blocks, fail closed on outbound-looking commands).
+      say(P + '⚠️ command-guard: unexpected error — falling back to the conservative checks. ' + String(e));
+      try { coreUnavailable(seen.command, say); } catch (x) { code = x instanceof Exit ? x.code : 2; }
+    }
   }
   return { code, stderr: lines.map((l) => l + '\n').join('') };
 }
