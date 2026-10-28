@@ -4,10 +4,11 @@
 // place_dir wholesale-copies config/hooks/lib), and it ships in the plugin build
 // too. A plugin-install caller disables audit logging OUTRIGHT (its own `enabled`
 // computation ANDs in "am I running from a /plugins/ path?") rather than relying
-// on profile-root resolution alone: CLAUDE_CONFIG_DIR is checked BEFORE the
-// hooksDir-based "own profile" fallback, so a plugin copy running inside a profile
-// that ALSO has the full kit installed (a real `.aka-claude-tools-meta`) would
-// otherwise double-log every decision alongside that profile's own hooks.
+// on profile-root resolution alone: the caller's profileRoots() maps a plugin-cache
+// copy to the profile holding that cache (derived from the hook file's own path,
+// never from the environment), so a plugin copy in a profile that ALSO has the full
+// kit installed (a real `.aka-claude-tools-meta`) would otherwise double-log every
+// decision alongside that profile's own hooks.
 //
 // Callers import this module LAZILY (`await import('./lib/audit.ts')`), AFTER their
 // own dynamic `import('./lib/guard-core.js')` has already succeeded — never as a
@@ -66,7 +67,7 @@ const KIT = 'aka-claude-tools';
 const HARNESS = 'claude';
 
 export interface AppendAuditOptions {
-  /** The active profile root (profileRoots()[0]), or null when there is none. */
+  /** The calling hook's own profile root (profileRoots()[0], derived from the hook file's path), or null when there is none. */
   profileRoot: string | null;
   /**
    * coexistencePolicy(...).auditLog, ANDed by the caller with "not a plugin

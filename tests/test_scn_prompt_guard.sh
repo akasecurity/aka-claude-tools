@@ -9,28 +9,31 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 command -v bun >/dev/null 2>&1 || { echo "SKIP: bun not installed"; exit 0; }
+unset CLAUDE_CONFIG_DIR
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 
-# Profiles: bare (no ai-tc) and ai-tc stubbed in (registry + enabled + cache dir), the
-# same shape test_scn_mcp_guard.sh uses.
-bare="$tmp/bare"; mkdir -p "$bare"
-prof="$tmp/aitc"; mkdir -p "$prof/plugins/cache/akasecurity/ai-tc/1"
-printf '%s' '{"plugins":{"ai-tc@akasecurity":[{}]}}' > "$prof/plugins/installed_plugins.json"
-printf '%s' '{"enabledPlugins":{"ai-tc@akasecurity":true}}' > "$prof/settings.json"
+# A hook derives its profile from its own path (<profile>/hooks/<file>), so every
+# fresh_hooks copy runs in its own profile, $tmp/<name>, which has no ai-tc unless
+# aitc_stub puts it there (registry + enabled + cache dir).
+aitc_stub() { # <profile-dir>
+  mkdir -p "$1/plugins/cache/akasecurity/ai-tc/1"
+  printf '%s' '{"plugins":{"ai-tc@akasecurity":[{}]}}' > "$1/plugins/installed_plugins.json"
+  printf '%s' '{"enabledPlugins":{"ai-tc@akasecurity":true}}' > "$1/settings.json"
+}
 
 # fresh_hooks <name> — a sandbox copy of config/hooks at $tmp/<name>/hooks; echoes its path.
 fresh_hooks() { mkdir -p "$tmp/$1"; cp -R config/hooks "$tmp/$1/hooks"; printf '%s' "$tmp/$1/hooks"; }
 
 fails=0
-# run <hooks-dir> <config-dir> <input-json> → sets GOT (exit), $tmp/out (stdout), $tmp/err (stderr)
+# run <hooks-dir> <input-json> → sets GOT (exit), $tmp/out (stdout), $tmp/err (stderr)
 run() {
   set +e
-  printf '%s' "$3" | CLAUDE_CONFIG_DIR="$2" bun "$1/prompt-guard.ts" >"$tmp/out" 2>"$tmp/err"
+  printf '%s' "$2" | bun "$1/prompt-guard.ts" >"$tmp/out" 2>"$tmp/err"
   GOT=$?
   set -e
 }
-expect_exit0() { # <label> <hooks-dir> <config-dir> <input-json>
-  run "$2" "$3" "$4"
+expect_exit0() { # <label> <hooks-dir> <input-json>
+  run "$2" "$3"
   if [ "$GOT" = 0 ]; then echo "  ok   $1 (exit 0)"
   else echo "  FAIL $1: want exit 0, got $GOT"; sed 's/^/       /' "$tmp/err"; fails=$((fails+1)); fi
 }
@@ -67,46 +70,47 @@ exfil_in="$(jq -cn --arg p "$EXFIL_PROMPT" '{prompt:$p,cwd:"/tmp"}')"
 echo "hook behavior:"
 h="$(fresh_hooks plain)"
 
-expect_exit0 "injection prompt" "$h" "$bare" "$inj_in"
+expect_exit0 "injection prompt" "$h" "$inj_in"
 expect_system_message "injection prompt warns" "prompt contains a prompt-injection marker."
 
-expect_exit0 "benign prompt" "$h" "$bare" "$benign_in"
+expect_exit0 "benign prompt" "$h" "$benign_in"
 expect_silent "benign prompt produces no output"
 
-expect_exit0 "secret-exfil prompt (no ai-tc)" "$h" "$bare" "$exfil_in"
+expect_exit0 "secret-exfil prompt (no ai-tc)" "$h" "$exfil_in"
 expect_system_message "secret-exfil prompt warns (no ai-tc)" "prompt pairs a credential value with a send/post/upload instruction."
 
 echo "ai-tc present:"
-expect_exit0 "secret-exfil prompt, ai-tc present" "$h" "$prof" "$exfil_in"
+ha="$(fresh_hooks plain-aitc)"; aitc_stub "$tmp/plain-aitc"
+expect_exit0 "secret-exfil prompt, ai-tc present" "$ha" "$exfil_in"
 expect_no_system_message_containing "ai-tc present: no secret-exfil warning" "credential value"
-expect_exit0 "injection prompt, ai-tc present" "$h" "$prof" "$inj_in"
+expect_exit0 "injection prompt, ai-tc present" "$ha" "$inj_in"
 expect_system_message "ai-tc present: injection still warns" "prompt contains a prompt-injection marker."
 
 echo "fail silent (never blocks, never prints its own errors):"
 h="$(fresh_hooks nocore)"; rm -f "$h/lib/guard-core.js"
-expect_exit0 "core missing" "$h" "$bare" "$inj_in"
+expect_exit0 "core missing" "$h" "$inj_in"
 expect_silent "core missing: no output at all"
 
 h="$(fresh_hooks badcore)"; printf 'export const VERSION="0";\n' > "$h/lib/guard-core.js"
-expect_exit0 "core incompatible (missing exports)" "$h" "$bare" "$inj_in"
+expect_exit0 "core incompatible (missing exports)" "$h" "$inj_in"
 expect_silent "core incompatible: no output at all"
 
 h="$(fresh_hooks nopat)"; rm -f "$h/lib/secret-patterns.json"
-expect_exit0 "secret patterns missing: still exits 0" "$h" "$bare" "$exfil_in"
+expect_exit0 "secret patterns missing: still exits 0" "$h" "$exfil_in"
 expect_no_system_message_containing "secret patterns missing: no secret-exfil warning" "credential value"
-expect_exit0 "secret patterns missing: injection marker still checked" "$h" "$bare" "$inj_in"
+expect_exit0 "secret patterns missing: injection marker still checked" "$h" "$inj_in"
 expect_system_message "secret patterns missing: injection still warns" "prompt contains a prompt-injection marker."
 
 h="$(fresh_hooks stdin)"
-expect_exit0 "stdin null" "$h" "$bare" 'null'
+expect_exit0 "stdin null" "$h" 'null'
 expect_silent "stdin null: silent"
-expect_exit0 "stdin array" "$h" "$bare" '[]'
+expect_exit0 "stdin array" "$h" '[]'
 expect_silent "stdin array: silent"
-expect_exit0 "stdin garbage (unparseable)" "$h" "$bare" 'not json at all'
+expect_exit0 "stdin garbage (unparseable)" "$h" 'not json at all'
 expect_silent "stdin garbage: silent"
-expect_exit0 "stdin object with no prompt field" "$h" "$bare" '{"cwd":"/tmp"}'
+expect_exit0 "stdin object with no prompt field" "$h" '{"cwd":"/tmp"}'
 expect_silent "stdin missing prompt: silent"
-expect_exit0 "stdin object with non-string prompt" "$h" "$bare" '{"prompt":7}'
+expect_exit0 "stdin object with non-string prompt" "$h" '{"prompt":7}'
 expect_silent "stdin non-string prompt: silent"
 
 echo "installer registration (select/deselect):"

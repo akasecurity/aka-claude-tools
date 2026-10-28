@@ -29,28 +29,32 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 command -v bun >/dev/null 2>&1 || { echo "SKIP: bun not installed"; exit 0; }
+unset CLAUDE_CONFIG_DIR
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 FIXDIR="tests/fixtures/posttooluse"
 
-# Profiles: bare (no ai-tc) and ai-tc stubbed in (registry + enabled + cache dir).
-bare="$tmp/bare"; mkdir -p "$bare"
-prof="$tmp/aitc"; mkdir -p "$prof/plugins/cache/akasecurity/ai-tc/1"
-printf '%s' '{"plugins":{"ai-tc@akasecurity":[{}]}}' > "$prof/plugins/installed_plugins.json"
-printf '%s' '{"enabledPlugins":{"ai-tc@akasecurity":true}}' > "$prof/settings.json"
+# A hook derives its profile from its own path (<profile>/hooks/<file>), so every
+# fresh_hooks copy runs in its own profile, $tmp/<name>, which has no ai-tc unless
+# aitc_stub puts it there (registry + enabled + cache dir).
+aitc_stub() { # <profile-dir>
+  mkdir -p "$1/plugins/cache/akasecurity/ai-tc/1"
+  printf '%s' '{"plugins":{"ai-tc@akasecurity":[{}]}}' > "$1/plugins/installed_plugins.json"
+  printf '%s' '{"enabledPlugins":{"ai-tc@akasecurity":true}}' > "$1/settings.json"
+}
 
 # fresh_hooks <name> — a sandbox copy of config/hooks at $tmp/<name>/hooks; echoes its path.
 fresh_hooks() { mkdir -p "$tmp/$1"; cp -R config/hooks "$tmp/$1/hooks"; printf '%s' "$tmp/$1/hooks"; }
 
 fails=0
-# run <hooks-dir> <config-dir> <input-json> → sets GOT (exit), $tmp/out (stdout), $tmp/err (stderr)
+# run <hooks-dir> <input-json> → sets GOT (exit), $tmp/out (stdout), $tmp/err (stderr)
 run() {
   set +e
-  printf '%s' "$3" | CLAUDE_CONFIG_DIR="$2" bun "$1/post-guard.ts" >"$tmp/out" 2>"$tmp/err"
+  printf '%s' "$2" | bun "$1/post-guard.ts" >"$tmp/out" 2>"$tmp/err"
   GOT=$?
   set -e
 }
-expect_exit() { # <label> <want-exit> <hooks-dir> <config-dir> <input-json>
-  run "$3" "$4" "$5"
+expect_exit() { # <label> <want-exit> <hooks-dir> <input-json>
+  run "$3" "$4"
   if [ "$GOT" = "$2" ]; then echo "  ok   $1 (exit $GOT)"
   else echo "  FAIL $1: want exit $2, got $GOT"; sed 's/^/       /' "$tmp/err"; fails=$((fails+1)); fi
 }
@@ -77,14 +81,14 @@ expect_no_token() { # <label> <token> — the token must not appear anywhere in 
   if grep -qF -- "$2" "$tmp/out"; then echo "  FAIL $1: raw token leaked into stdout"; fails=$((fails+1))
   else echo "  ok   $1"; fi
 }
-# expect_structural_redact <label> <hooks-dir> <config-dir> <envelope-json> <mask-jq-expr> <field>
+# expect_structural_redact <label> <hooks-dir> <envelope-json> <mask-jq-expr> <field>
 #   Runs the hook, then proves the rewrite is a WHOLE-SHAPE match to the pre-hook
 #   tool_response with only the known text field masked (in both, to the same sentinel) —
 #   not just "no raw token appears anywhere". <field> is updatedToolOutput or
 #   updatedMCPToolOutput.
 expect_structural_redact() {
-  local label="$1" h="$2" cfg="$3" envelope="$4" maskexpr="$5" field="$6"
-  run "$h" "$cfg" "$envelope"
+  local label="$1" h="$2" envelope="$3" maskexpr="$4" field="$5"
+  run "$h" "$envelope"
   if [ "$GOT" != 0 ]; then echo "  FAIL $label: exit $GOT"; sed 's/^/       /' "$tmp/err"; fails=$((fails+1)); return; fi
   if ! jq -e . >/dev/null 2>&1 < "$tmp/out"; then echo "  FAIL $label: stdout not JSON: $(cat "$tmp/out")"; fails=$((fails+1)); return; fi
   if grep -qF -- "$GHP" "$tmp/out"; then echo "  FAIL $label: raw token leaked into stdout"; fails=$((fails+1)); return; fi
@@ -140,25 +144,25 @@ other_tool='{"tool_name":"Bash","tool_response":{"stdout":"hi"}}'
 echo "clean fixtures (real captures, unmodified): no stdout, no stderr:"
 h="$(fresh_hooks clean)"
 for fx in "$read_fixture" "$webfetch_fixture" "$websearch_fixture" "$mcp_fixture"; do
-  expect_exit "clean fixture: exit 0" 0 "$h" "$bare" "$fx"
+  expect_exit "clean fixture: exit 0" 0 "$h" "$fx"
   expect_no_stdout "clean fixture: no stdout"
   expect_no_err "clean fixture: no notice" "post-guard:"
 done
-expect_exit "non-scanned tool passes through silently" 0 "$h" "$bare" "$other_tool"
+expect_exit "non-scanned tool passes through silently" 0 "$h" "$other_tool"
 expect_no_stdout "non-scanned tool: no stdout"
 expect_no_err "non-scanned tool: no stderr" "post-guard:"
 
 echo "redaction: whole-shape structural match against the real fixture, text field masked:"
-expect_structural_redact "Read secret"      "$h" "$bare" "$read_secret"      "$MASK_READ"      "updatedToolOutput"
-expect_structural_redact "WebFetch secret"  "$h" "$bare" "$webfetch_secret"  "$MASK_WEBFETCH"  "updatedToolOutput"
-expect_structural_redact "WebSearch secret" "$h" "$bare" "$websearch_secret" "$MASK_WEBSEARCH" "updatedToolOutput"
-expect_structural_redact "mcp secret"       "$h" "$bare" "$mcp_secret"       "$MASK_MCP"       "updatedMCPToolOutput"
+expect_structural_redact "Read secret"      "$h" "$read_secret"      "$MASK_READ"      "updatedToolOutput"
+expect_structural_redact "WebFetch secret"  "$h" "$webfetch_secret"  "$MASK_WEBFETCH"  "updatedToolOutput"
+expect_structural_redact "WebSearch secret" "$h" "$websearch_secret" "$MASK_WEBSEARCH" "updatedToolOutput"
+expect_structural_redact "mcp secret"       "$h" "$mcp_secret"       "$MASK_MCP"       "updatedMCPToolOutput"
 # Read/WebFetch/WebSearch rewrite via updatedToolOutput only; mcp via updatedMCPToolOutput
 # only — never both fields on the same response.
-run "$h" "$bare" "$read_secret"
+run "$h" "$read_secret"
 [ "$(jq -r '.hookSpecificOutput.updatedMCPToolOutput // "absent"' "$tmp/out")" = "absent" ] \
   && echo "  ok   Read: no updatedMCPToolOutput field" || { echo "  FAIL Read: unexpected updatedMCPToolOutput"; fails=$((fails+1)); }
-run "$h" "$bare" "$mcp_secret"
+run "$h" "$mcp_secret"
 [ "$(jq -r '.hookSpecificOutput.updatedToolOutput // "absent"' "$tmp/out")" = "absent" ] \
   && echo "  ok   mcp: no updatedToolOutput field" || { echo "  FAIL mcp: unexpected updatedToolOutput"; fails=$((fails+1)); }
 [ "$(jq -r '.hookSpecificOutput.updatedMCPToolOutput | type' "$tmp/out")" = "array" ] \
@@ -181,23 +185,23 @@ expect_injection_stdout() {
 }
 
 echo "injection markers: WebFetch, WebSearch, mcp — Read is exempt:"
-expect_exit "WebFetch injection: exit 0" 0 "$h" "$bare" "$webfetch_injection"
+expect_exit "WebFetch injection: exit 0" 0 "$h" "$webfetch_injection"
 expect_err "WebFetch injection: stderr notice" "post-guard: output contains a prompt-injection marker."
 expect_injection_stdout "WebFetch injection: systemMessage + additionalContext on stdout"
-expect_exit "WebSearch injection (synopsis): exit 0" 0 "$h" "$bare" "$websearch_injection_synopsis"
+expect_exit "WebSearch injection (synopsis): exit 0" 0 "$h" "$websearch_injection_synopsis"
 expect_err "WebSearch injection (synopsis): stderr notice" "post-guard: output contains a prompt-injection marker."
 expect_injection_stdout "WebSearch injection (synopsis): systemMessage + additionalContext on stdout"
-expect_exit "mcp injection: exit 0" 0 "$h" "$bare" "$mcp_injection"
+expect_exit "mcp injection: exit 0" 0 "$h" "$mcp_injection"
 expect_err "mcp injection: stderr notice" "post-guard: output contains a prompt-injection marker."
 expect_injection_stdout "mcp injection: systemMessage + additionalContext on stdout"
-expect_exit "Read injection: exit 0" 0 "$h" "$bare" "$read_injection"
+expect_exit "Read injection: exit 0" 0 "$h" "$read_injection"
 expect_no_err "Read is exempt from injection scanning" "prompt-injection marker"
 expect_no_stdout "Read injection: no stdout at all (exempt, and nothing else to report)"
 
 echo "combined: a redaction AND an injection marker on the same event share ONE stdout JSON object:"
 mcp_secret_and_injection="$(jq -c --arg s "$GHP" --arg t "$INJECT" \
   '.tool_response = [{type:"text",text:("secret: " + $s)},{type:"text",text:$t}]' <<<"$mcp_fixture")"
-run "$h" "$bare" "$mcp_secret_and_injection"
+run "$h" "$mcp_secret_and_injection"
 [ "$GOT" = 0 ] && echo "  ok   combined mcp redaction+injection: exit 0" || { echo "  FAIL combined mcp redaction+injection: exit $GOT"; fails=$((fails+1)); }
 if grep -qF -- "$GHP" "$tmp/out"; then echo "  FAIL combined: raw token leaked into stdout"; fails=$((fails+1)); fi
 [ "$(jq -r '.hookSpecificOutput.updatedMCPToolOutput[0].text // "absent"' "$tmp/out")" = "secret: [REDACTED:GitHub token]" ] \
@@ -216,30 +220,45 @@ esac
   || { echo "  FAIL combined: additionalContext wrong: $(cat "$tmp/out")"; fails=$((fails+1)); }
 
 echo "fix 7 — WebSearch injection scan covers hit TITLES, not just the synopsis/urls:"
-expect_exit "WebSearch injection (title): exit 0" 0 "$h" "$bare" "$websearch_injection_title"
+expect_exit "WebSearch injection (title): exit 0" 0 "$h" "$websearch_injection_title"
 expect_err "WebSearch injection (title): stderr notice" "post-guard: output contains a prompt-injection marker."
 
 echo "ai-tc present: Read/WebFetch defer, WebSearch/mcp still redact; injection always runs:"
-expect_exit "Read + ai-tc: exit 0" 0 "$h" "$prof" "$read_secret"
+ha="$(fresh_hooks clean-aitc)"; aitc_stub "$tmp/clean-aitc"
+expect_exit "Read + ai-tc: exit 0" 0 "$ha" "$read_secret"
 expect_no_stdout "Read + ai-tc: no redaction (ai-tc covers Read)"
-expect_exit "WebFetch + ai-tc: exit 0" 0 "$h" "$prof" "$webfetch_secret"
+expect_exit "WebFetch + ai-tc: exit 0" 0 "$ha" "$webfetch_secret"
 expect_no_stdout "WebFetch + ai-tc: no redaction (ai-tc covers WebFetch)"
-expect_exit "WebSearch + ai-tc: exit 0" 0 "$h" "$prof" "$websearch_secret"
+expect_exit "WebSearch + ai-tc: exit 0" 0 "$ha" "$websearch_secret"
 expect_stdout_json "WebSearch + ai-tc: still redacted (ai-tc doesn't cover WebSearch)"
-expect_exit "mcp + ai-tc: exit 0" 0 "$h" "$prof" "$mcp_secret"
+expect_exit "mcp + ai-tc: exit 0" 0 "$ha" "$mcp_secret"
 expect_stdout_json "mcp + ai-tc: still redacted (ai-tc never covers mcp__*)"
-expect_exit "WebFetch injection + ai-tc: exit 0" 0 "$h" "$prof" "$webfetch_injection"
+expect_exit "WebFetch injection + ai-tc: exit 0" 0 "$ha" "$webfetch_injection"
 expect_err "WebFetch injection + ai-tc: notice still fires" "post-guard: output contains a prompt-injection marker."
+
+echo "CLAUDE_CONFIG_DIR is not consulted: a hook in a profile without ai-tc still redacts Read/WebFetch:"
+decoy_redact() { # <label> <envelope>
+  local got
+  set +e; printf '%s' "$2" | CLAUDE_CONFIG_DIR="$tmp/clean-aitc" bun "$h/post-guard.ts" >"$tmp/out" 2>"$tmp/err"; got=$?; set -e
+  if [ "$got" = 0 ] && jq -e . >/dev/null 2>&1 < "$tmp/out" && ! grep -qF -- "$GHP" "$tmp/out" \
+    && grep -qF -- "post-guard: redacted" "$tmp/err"; then
+    echo "  ok   $1 still redacted with CLAUDE_CONFIG_DIR naming an ai-tc profile"
+  else
+    echo "  FAIL $1 not redacted with CLAUDE_CONFIG_DIR naming an ai-tc profile (exit $got): $(cat "$tmp/out")"; fails=$((fails+1))
+  fi
+}
+decoy_redact "Read secret" "$read_secret"
+decoy_redact "WebFetch secret" "$webfetch_secret"
 
 echo "fix 3 — a non-array mcp tool_response still gets redacted, in its own shape:"
 mcp_bare_string_secret="$(jq -cn --arg s "$GHP" '{tool_name:"mcp__x__y",tool_response:("secret: " + $s)}')"
-run "$h" "$bare" "$mcp_bare_string_secret"
+run "$h" "$mcp_bare_string_secret"
 [ "$GOT" = 0 ] && echo "  ok   mcp bare-string response: exit 0" || { echo "  FAIL mcp bare-string response: exit $GOT"; fails=$((fails+1)); }
 [ "$(jq -r '.hookSpecificOutput.updatedMCPToolOutput' "$tmp/out")" = "secret: [REDACTED:GitHub token]" ] \
   && echo "  ok   mcp bare-string response: redacted, still a bare string (original shape)" \
   || { echo "  FAIL mcp bare-string response: unexpected output: $(cat "$tmp/out")"; fails=$((fails+1)); }
 mcp_wrapped_secret="$(jq -cn --arg s "$GHP" '{tool_name:"mcp__x__y",tool_response:{content:[{type:"text",text:("secret: " + $s)}]}}')"
-run "$h" "$bare" "$mcp_wrapped_secret"
+run "$h" "$mcp_wrapped_secret"
 [ "$GOT" = 0 ] && echo "  ok   mcp {content:[...]}-wrapped response: exit 0" || { echo "  FAIL mcp wrapped response: exit $GOT"; fails=$((fails+1)); }
 [ "$(jq -r '.hookSpecificOutput.updatedMCPToolOutput.content[0].text' "$tmp/out")" = "secret: [REDACTED:GitHub token]" ] \
   && echo "  ok   mcp wrapped response: redacted, still { content: [...] }-shaped (original shape)" \
@@ -254,7 +273,7 @@ mcp_resource="$(jq -cn --arg s "$GHP" '{tool_name:"mcp__x__y",tool_response:[
   {type:"resource",resource:{uri:"file:///b.bin",mimeType:"application/octet-stream",blob:$s}},
   {type:"image",data:$s,mimeType:"image/png"}
 ]}')"
-run "$h" "$bare" "$mcp_resource"
+run "$h" "$mcp_resource"
 [ "$GOT" = 0 ] && echo "  ok   mcp resource block: exit 0" || { echo "  FAIL mcp resource block: exit $GOT"; fails=$((fails+1)); }
 expect_err "mcp resource block: redact notice" "post-guard: redacted"
 [ "$(jq -r '.hookSpecificOutput.updatedMCPToolOutput[0].resource.text' "$tmp/out")" = "doc says [REDACTED:GitHub token]" ] \
@@ -279,7 +298,7 @@ const input = JSON.stringify({tool_name:"mcp__x__y", tool_response:[
 await Bun.write(process.argv[1], input);
 ' "$mcp_mixed_size"
 set +e
-CLAUDE_CONFIG_DIR="$bare" bun "$h/post-guard.ts" < "$mcp_mixed_size" >"$tmp/out" 2>"$tmp/err"
+bun "$h/post-guard.ts" < "$mcp_mixed_size" >"$tmp/out" 2>"$tmp/err"
 GOT=$?
 set -e
 [ "$GOT" = 0 ] && echo "  ok   mixed-size mcp response: exit 0" || { echo "  FAIL mixed-size mcp response: exit $GOT"; fails=$((fails+1)); }
@@ -294,7 +313,7 @@ expect_err "mixed-size mcp response: truncated notice (big block)" "post-guard: 
 
 echo "fix 6 — a non-text (image) Read result is never scanned, even though it looks token-shaped:"
 read_image="$(jq -cn --arg s "$GHP" '{tool_name:"Read",tool_response:{type:"image",file:{base64:$s,type:"image/png",originalSize:100}}}')"
-run "$h" "$bare" "$read_image"
+run "$h" "$read_image"
 [ "$GOT" = 0 ] && echo "  ok   Read image response: exit 0" || { echo "  FAIL Read image response: exit $GOT"; fails=$((fails+1)); }
 expect_no_stdout "Read image response: no rewrite (file.base64 is never scanned)"
 expect_no_err "Read image response: no redact notice" "post-guard: redacted"
@@ -308,7 +327,7 @@ await Bun.write(process.argv[2], JSON.stringify(fixture));
 ' "$FIXDIR/Read.json" "$big"
 start=$(date +%s)
 set +e
-CLAUDE_CONFIG_DIR="$bare" bun "$h/post-guard.ts" < "$big" >"$tmp/out" 2>"$tmp/err"
+bun "$h/post-guard.ts" < "$big" >"$tmp/out" 2>"$tmp/err"
 GOT=$?
 set -e
 end=$(date +%s)
@@ -326,18 +345,18 @@ expect_err "large output: truncated-scan notice" "post-guard: output too large t
 echo "internal failure: exactly one stderr line, no stdout, exit 0 (never blocks):"
 h2="$(fresh_hooks nocore)"; rm -f "$h2/lib/guard-core.js"
 CORE_MSG='post-guard: disabled — the guard-core library is missing or incompatible; original tool output passed through unchanged.'
-expect_exit "core missing: exit 0" 0 "$h2" "$bare" "$read_secret"
+expect_exit "core missing: exit 0" 0 "$h2" "$read_secret"
 expect_no_stdout "core missing: no stdout"
 expect_err_exact "core missing: exactly the disabled message" "$CORE_MSG"
 
 STDIN_MSG='post-guard: disabled — could not parse the hook input; original tool output passed through unchanged.'
-expect_exit "unparseable stdin: exit 0" 0 "$h" "$bare" '{not json'
+expect_exit "unparseable stdin: exit 0" 0 "$h" '{not json'
 expect_no_stdout "unparseable stdin: no stdout"
 expect_err_exact "unparseable stdin: exactly the disabled message" "$STDIN_MSG"
-expect_exit "stdin null: exit 0" 0 "$h" "$bare" 'null'
+expect_exit "stdin null: exit 0" 0 "$h" 'null'
 expect_no_stdout "stdin null: no stdout"
 expect_err_exact "stdin null: exactly the disabled message" "$STDIN_MSG"
-expect_exit "stdin is an array: exit 0" 0 "$h" "$bare" '[1,2,3]'
+expect_exit "stdin is an array: exit 0" 0 "$h" '[1,2,3]'
 expect_no_stdout "stdin is an array: no stdout"
 expect_err_exact "stdin is an array: exactly the disabled message" "$STDIN_MSG"
 

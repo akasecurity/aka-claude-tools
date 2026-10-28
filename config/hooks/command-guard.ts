@@ -452,23 +452,27 @@ function projectOpt(input: { cwd?: unknown }): { projectDir?: string } {
   return typeof input.cwd === 'string' && isAbsolute(input.cwd) ? { projectDir: input.cwd } : {};
 }
 
-// The profile this session runs in: ai-tc only counts if its hooks run here too.
-function profileRoots(env: HookEnv): string[] {
-  const dir = env.CLAUDE_CONFIG_DIR;
-  if (dir && dir.startsWith('/')) return [dir];
+// The profile this hook belongs to: ai-tc only counts if its hooks run there too. Derived
+// from this file's own location only, never from the environment, so a session's env
+// cannot point ai-tc detection (or the audit log) at another directory:
+//   <profile>/hooks/<file>                                              -> [<profile>]
+//   <profile>/plugins/cache/<marketplace>/<name>/<version>/hooks/<file> -> [<profile>]
+// Any other location yields no root, which detectAitc reads as "ai-tc absent", so every
+// scan runs.
+function profileRoots(): string[] {
   const hooksDir = dirname(fileURLToPath(import.meta.url));
+  const cached = /^(\/.+)\/plugins\/cache\/[^/]+\/[^/]+\/[^/]+\/hooks$/.exec(hooksDir);
+  if (cached) return [cached[1]];
   if (hooksDir.endsWith('/hooks') && !hooksDir.includes('/plugins/')) return [dirname(hooksDir)];
-  return [join(homedir(), '.claude')];
+  return [];
 }
 
 // True when THIS FILE is running from a Claude Code plugin install path
-// (…/plugins/cache/<marketplace>/<name>/<version>/hooks/…). Independent of
-// profileRoots(): CLAUDE_CONFIG_DIR is checked FIRST there, so a plugin copy
-// invoked inside a profile that ALSO has the full kit installed (a real
-// .aka-claude-tools-meta) would otherwise resolve to that real profile and
-// double-log every decision alongside that profile's own hooks. Audit logging is
-// disabled outright for a plugin install, never left to depend on whether the
-// active profile happens to carry a meta file.
+// (…/plugins/cache/<marketplace>/<name>/<version>/hooks/…). profileRoots() maps such a
+// copy to the profile holding that plugin cache, and that profile may ALSO have the full
+// kit installed (a real .aka-claude-tools-meta) whose own hooks log every decision; a
+// plugin copy logging too would double-log. Audit logging is disabled outright for a
+// plugin install, never left to depend on whether its profile happens to carry a meta file.
 function isPluginInstall(): boolean {
   return dirname(fileURLToPath(import.meta.url)).includes('/plugins/');
 }
@@ -539,7 +543,7 @@ async function main(raw: string, env: HookEnv, say: Say, seen: { command?: strin
   let scanSecrets = true;
   let auditLog = true;
   try {
-    const policy = core.coexistencePolicy(core.detectAitc('claude', { home: homedir(), roots: profileRoots(env), ...projectOpt(input) }));
+    const policy = core.coexistencePolicy(core.detectAitc('claude', { home: homedir(), roots: profileRoots(), ...projectOpt(input) }));
     scanSecrets = policy.scanSecrets('Bash') !== false;
     auditLog = policy.auditLog !== false;
   } catch { scanSecrets = true; auditLog = true; }
@@ -598,7 +602,7 @@ async function main(raw: string, env: HookEnv, say: Say, seen: { command?: strin
     const { appendAudit } = await import('./lib/audit.ts');
     const alert = (d.notices as { level?: unknown; code?: unknown; message?: unknown }[])
       .find((n) => n && typeof n === 'object' && n.level === 'alert');
-    const profileRoot = profileRoots(env)[0] ?? null;
+    const profileRoot = profileRoots()[0] ?? null;
     const enabled = auditLog && !isPluginInstall();
     if (d.kind === 'block') {
       appendAudit(
