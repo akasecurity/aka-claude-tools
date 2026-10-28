@@ -1,9 +1,21 @@
-# aka-claude-tools
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="media/cover-dark.svg">
+  <img src="media/cover-light.svg" alt="claude-tools by AKA Security, the clean slate a fresh Claude Code should start from. Illustration: a vehicle leaves a clean, empty bay at a depot, passes a row of locked credential lockers, and exits through a guarded gate where a van labeled egress is stopped at a lowered barrier." width="100%">
+</picture>
 
-<p align="center"><img src="media/banner.svg" alt="aka-claude-tools: clean context, locked doors, guarded exits for Claude Code. MIT · needs jq + bun." width="100%"></p>
+<p align="center">
+  <a href="#quick-start"><b>Install</b></a> &nbsp;·&nbsp;
+  <a href="#what-it-guards-against"><b>What it guards against</b></a> &nbsp;·&nbsp;
+  <a href="#whats-inside"><b>What's inside</b></a> &nbsp;·&nbsp;
+  <a href="SECURITY.md"><b>Security</b></a>
+</p>
 
-![version](https://img.shields.io/github/v/tag/akasecurity/claude-tools?label=version&color=blue)
-![license](https://img.shields.io/badge/license-MIT-green)
+<h3 align="center">The clean slate a fresh Claude Code should start from.</h3>
+
+<p align="center">
+  <img alt="version" src="https://img.shields.io/github/v/tag/akasecurity/aka-claude-tools?label=version&color=blue">
+  <img alt="license" src="https://img.shields.io/badge/license-MIT-green">
+</p>
 
 **Make Claude Code safer to use.** Clean context, locked-down credentials, guarded
 egress. The security defaults Claude Code doesn't ship with, layered onto a profile
@@ -13,7 +25,7 @@ New to this? Hand the repo to Claude and it sets you up. Comfortable in a termin
 Read every hook first. It's all plain shell and TypeScript, MIT, and the guards scan
 locally: nothing is uploaded to run them.
 
-> Also known as `aka-claude-tools` (the npm package, Homebrew formula, and CLI name). Repo: `akasecurity/claude-tools`. The guard-hooks plugin installs as `aka-claude-tools@akasecurity`.
+> Also known as `aka-claude-tools` (the Homebrew formula and CLI name; the npm package is `@akasecurity/claude-tools`). Repo: `akasecurity/aka-claude-tools`. The guard-hooks plugin installs as `aka-claude-tools@akasecurity`.
 
 From [akasecurity](https://akasecurity.io) · MIT · needs `jq` + `bun`.
 
@@ -48,7 +60,7 @@ namespace: its git-style dispatcher makes `aka claude` launch this profile.
 
 **Hand it to Claude.** In a logged-in Claude Code session, say:
 
-> Set up aka-claude-tools from github.com/akasecurity/claude-tools.
+> Set up aka-claude-tools from github.com/akasecurity/aka-claude-tools.
 > Read its agent-install.md and set up a hardened profile for me.
 
 It reads the guide, checks what you already have, migrates it cleanly, and runs the
@@ -81,8 +93,8 @@ exists.
 **Or clone and run:**
 
 ```bash
-git clone git@github.com:akasecurity/claude-tools.git
-cd claude-tools
+git clone git@github.com:akasecurity/aka-claude-tools.git
+cd aka-claude-tools
 ./install.sh             # interactive
 ./install.sh --defaults  # accept the recommended ten
 ./install.sh --help      # every flag and env var; changes nothing
@@ -125,7 +137,7 @@ A guard you haven't watched fire is one you're only assuming works. Launch the p
 
 ## What's inside
 
-<p align="center"><img src="media/whats-inside.svg" alt="What's inside: additions grouped by what they do (graphic not yet refreshed for this release's count)." width="100%"></p>
+<p align="center"><img src="media/whats-inside.svg" alt="What's inside: additions grouped by what they do." width="100%"></p>
 
 Nineteen additions; the menu is driven entirely by
 [`config/additions.json`](config/additions.json), the single source both install paths read.
@@ -133,25 +145,25 @@ Prefer a visual tour? See the [what's-inside carousel](media/decks/whats-inside.
 
 | Addition | What it does | Default |
 |---|---|---|
-| `secure-settings` | Denies reads of SSH keys, cloud creds, `.env`, keychains; blocks writes to shell startup files; no auto-loaded MCP servers. | ● on |
-| `sandbox` | Enables Claude Code's native OS-level sandbox, so Bash and every other tool run confined, not just the Read tool. Claude Code's own sandbox already merges `secure-settings`'s Read-deny credential paths into its filesystem restrictions at runtime, so this addition doesn't duplicate that list itself. While selected it owns `sandbox.enabled` (a manual edit back to `false` is warned about and set back to `true` on the next apply — deselect the addition to actually turn the sandbox off). Changes Bash behaviour in every session; needs `bwrap` and `socat` on PATH on Linux (macOS always supported; skipped elsewhere with a notice). | ○ opt-in |
-| `leak-guard` | Scans what the agent sends to the web and blocks anything shaped like a secret. Scanned locally, nothing uploaded to check it. | ● on |
-| `command-guard` | Blocks `curl…\|bash`, edits to your shell startup files, and credentials being shipped out. An opt-in `CT_TRUSTED_BOOTSTRAP_URLS` allowlist can exempt specific installer-script URLs from the `curl\|bash` block (see [Configuring the opt-in env keys](#configuring-the-opt-in-env-keys) below). | ● on |
-| `mcp-guard` | Applies your MCP server allow/deny lists (`CT_MCP_ALLOW` / `CT_MCP_DENY`) and blocks MCP tool inputs carrying anything shaped like a secret. It runs on every MCP call, so it checks key shapes and your org markers only; trufflehog stays on the Bash and web egress guards, for latency. The plugin install scans only; the lists come with the full kit. | ● on |
-| `post-guard` | Redacts anything shaped like a secret from what a file read, a web fetch, a web search, or an MCP tool call returns, rewriting the output before the model sees it — a PostToolUse hook, so it rewrites rather than blocks. Also warns, via Claude Code's `systemMessage` channel and to the model itself as additional context (never blocks), when fetched, searched, or MCP-returned content carries a prompt-injection phrase like "ignore previous instructions". An MCP resource block's own text is scanned like any other text; only image data and a resource's binary blob field are never scanned. | ● on |
-| `prompt-guard` | Scans what YOU just typed, not a tool call: prompt-injection phrasing, a credential paired with a send/upload instruction, and encoded blobs that decode to a shell command. Warns only — never blocks, never edits your prompt, never adds anything to the model's context. | ○ opt-in |
-| `rtk-safe` | Compresses supported standalone commands, including `grep`/`rg` — native flags, exit codes and regex dialect are preserved, but long result sets are **summarised**: you get the first ~25 matches plus an exact count of what was hidden and a `rtk recall` handle to retrieve it. Requires stable [`rtk`](https://github.com/rtk-ai/rtk) ≥ 0.49.0; otherwise leaves commands unchanged. Leaves `head`, `-h`/`--help`, and anything with a shell operator or substitution untouched, and preserves project scripts and interpreter selection. `rg`'s auto-approval requires `command-guard`. | ● on |
-| `statusline` | A status bar with live context-fill and rate-limit gauges. | ● on |
-| `shell-audit` | On-demand, read-only scan of your shell startup for hardcoded creds, risky hooks, and stale aliases. | ● on |
-| `wrap-up` | A `/wrap-up` command that summarizes, verifies, and stages a commit for review. Never commits on its own. | ○ opt-in |
-| `secure-deep-research` | Privacy-aware web research with per-claim adversarial verification before a cited synthesis. Sensitive topics are gated and routed through your own search instance. | ○ opt-in |
-| `harness-pointer` | A small nudge pointing the agent at the right CLI for your environment. Ships empty. | ○ opt-in |
-| `notify-osc` | A desktop notification when it's genuinely your turn — stays quiet while a background task (agent or shell) is still running. Auto-detects your terminal (Ghostty, kitty, WezTerm, iTerm2); works over SSH. | ○ opt-in |
-| `error-reporting-off` | Sets `DISABLE_ERROR_REPORTING` to opt out of Sentry error reporting. | ● on |
-| `feedback-off` | Sets `DISABLE_FEEDBACK_COMMAND` to disable the `/feedback` command. | ● on |
-| `feedback-survey-off` | Sets `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` to disable session quality surveys. | ● on |
-| `telemetry-off` | Sets `DISABLE_TELEMETRY`. Opt-in because it disables Remote Control (driving the CLI from a claude.ai session). | ○ opt-in |
-| `autoupdater-off` | Sets `DISABLE_AUTOUPDATER` to stop background updates; `claude update` still works. | ○ opt-in |
+| `secure-settings` | Denies reads of SSH keys, cloud creds, `.env`, keychains; blocks writes to shell startup files; no auto-loaded MCP servers. | on |
+| `sandbox` | Enables Claude Code's native OS-level sandbox, so Bash and every other tool run confined, not just the Read tool. Claude Code's own sandbox already merges `secure-settings`'s Read-deny credential paths into its filesystem restrictions at runtime, so this addition doesn't duplicate that list itself. While selected it owns `sandbox.enabled` (a manual edit back to `false` is warned about and set back to `true` on the next apply; deselect the addition to actually turn the sandbox off). Changes Bash behavior in every session; needs `bwrap` and `socat` on PATH on Linux (macOS always supported; skipped elsewhere with a notice). | opt-in |
+| `leak-guard` | Scans what the agent sends to the web and blocks anything shaped like a secret. Scanned locally, nothing uploaded to check it. | on |
+| `command-guard` | Blocks `curl…\|bash`, edits to your shell startup files, and credentials being shipped out. An opt-in `CT_TRUSTED_BOOTSTRAP_URLS` allowlist can exempt specific installer-script URLs from the `curl\|bash` block (see [Configuring the opt-in env keys](#configuring-the-opt-in-env-keys) below). | on |
+| `mcp-guard` | Applies your MCP server allow/deny lists (`CT_MCP_ALLOW` / `CT_MCP_DENY`) and blocks MCP tool inputs carrying anything shaped like a secret. It runs on every MCP call, so it checks key shapes and your org markers only; trufflehog stays on the Bash and web egress guards, for latency. The plugin install scans only; the lists come with the full kit. | on |
+| `post-guard` | Redacts anything shaped like a secret from what a file read, a web fetch, a web search, or an MCP tool call returns, rewriting the output before the model sees it — a PostToolUse hook, so it rewrites rather than blocks. Also warns, via Claude Code's `systemMessage` channel and to the model itself as additional context (never blocks), when fetched, searched, or MCP-returned content carries a prompt-injection phrase like "ignore previous instructions". An MCP resource block's own text is scanned like any other text; only image data and a resource's binary blob field are never scanned. | on |
+| `prompt-guard` | Scans what YOU just typed, not a tool call: prompt-injection phrasing, a credential paired with a send/upload instruction, and encoded blobs that decode to a shell command. Warns only — never blocks, never edits your prompt, never adds anything to the model's context. | opt-in |
+| `rtk-safe` | Compresses supported standalone commands, including `grep`/`rg`. Native flags, exit codes and regex dialect are preserved, but long result sets are **summarized**: you get the first ~25 matches plus an exact count of what was hidden and a `rtk recall` handle to retrieve it. Requires stable [`rtk`](https://github.com/rtk-ai/rtk) ≥ 0.49.0; otherwise leaves commands unchanged. Leaves `head`, `-h`/`--help`, and anything with a shell operator or substitution untouched, and preserves project scripts and interpreter selection. `rg`'s auto-approval requires `command-guard`. | on |
+| `statusline` | A status bar with live context-fill and rate-limit gauges. | on |
+| `shell-audit` | On-demand, read-only scan of your shell startup for hardcoded creds, risky hooks, and stale aliases. | on |
+| `wrap-up` | A `/wrap-up` command that summarizes, verifies, and stages a commit for review. Never commits on its own. | opt-in |
+| `secure-deep-research` | Privacy-aware web research with per-claim adversarial verification before a cited synthesis. Sensitive topics are gated and routed through your own search instance. | opt-in |
+| `harness-pointer` | A small nudge pointing the agent at the right CLI for your environment. Ships empty. | opt-in |
+| `notify-osc` | A desktop notification when it's genuinely your turn — stays quiet while a background task (agent or shell) is still running. Auto-detects your terminal (Ghostty, kitty, WezTerm, iTerm2); works over SSH. | opt-in |
+| `error-reporting-off` | Sets `DISABLE_ERROR_REPORTING` to opt out of Sentry error reporting. | on |
+| `feedback-off` | Sets `DISABLE_FEEDBACK_COMMAND` to disable the `/feedback` command. | on |
+| `feedback-survey-off` | Sets `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` to disable session quality surveys. | on |
+| `telemetry-off` | Sets `DISABLE_TELEMETRY`. Opt-in because it disables Remote Control (driving the CLI from a claude.ai session). | opt-in |
+| `autoupdater-off` | Sets `DISABLE_AUTOUPDATER` to stop background updates; `claude update` still works. | opt-in |
 
 `statusline` also has its own opt-in **sidecar**: set `CLAUDE_TOOLS_STATUS_SIDECAR_DIR` and it
 writes `<dir>/<session_id>.json` with the session's context-window usage, model, and cwd — plus Claude Code's rate-limit windows (`rate_limits`: five-hour and seven-day usage and reset time) when it supplies them — fields
@@ -164,6 +176,9 @@ unset means no file and no change in behavior. Example, in `settings.json`:
 ```
 
 ### Configuring the opt-in env keys
+
+<details>
+<summary><b>The policy keys</b>: MCP allow and deny lists, trusted bootstrap URLs</summary>
 
 Four of the additions above read per-environment policy from
 [`shared/aka-claude-tools.config.example`](shared/aka-claude-tools.config.example) (copied to
@@ -207,7 +222,12 @@ Full format details and worked examples for all three keys live as comments dire
 [`shared/aka-claude-tools.config.example`](shared/aka-claude-tools.config.example) — read it before
 setting any of them.
 
+</details>
+
 ## Local security-event audit log
+
+<details>
+<summary><b>Reading the log</b>: the command, what a line holds, and when ai-tc takes over</summary>
 
 `command-guard`, `leak-guard`, `mcp-guard`, and `prompt-guard` each write one line
 per block, alert, or prompt-injection notice to a local, append-only log:
@@ -235,7 +255,12 @@ silently, the same as any other logging failure.
 and enabled for the profile, this log turns off entirely. ai-tc keeps its own audit
 trail, so claude-tools steps aside instead of double-logging the same decision.
 
+</details>
+
 ## Integrity check
+
+<details>
+<summary><b>What the check covers</b>: the manifest, the drift line, and its limits</summary>
 
 The installer writes an integrity manifest, `<profile>/.aka-integrity.json`: a
 sha256 of every kit-managed hook, library file, and launcher shim, plus a hash of
@@ -270,6 +295,8 @@ drift, not a determined attacker. Like the audit log, it never blocks — a
 `SessionStart` hook can only print, and the check fails silent on its own
 internal error — and it runs regardless of ai-tc; only the audit log defers to
 ai-tc's own trail.
+
+</details>
 
 ## Profiles
 
@@ -342,5 +369,5 @@ The implementations here are our own. Built for
 
 The guard hooks run on a vendored copy of guard-core (`config/hooks/lib/guard-core.js`,
 also shipped in the plugin), from guard-core, MIT, Copyright (c) 2026
-William Lin. Its licence text travels in that file's header; `tools/vendor-guard-core.sh`
+William Lin. Its license text travels in that file's header; `tools/vendor-guard-core.sh`
 re-adds the header on every re-vendor.

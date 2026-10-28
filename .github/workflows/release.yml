@@ -14,13 +14,13 @@ jobs:
     name: Build, publish, and release
     runs-on: ubuntu-latest
     # Releases must originate ONLY from the PUBLIC repo: the download/Homebrew URLs
-    # below hardcode akasecurity/claude-tools, and `npm publish --provenance`
+    # below hardcode akasecurity/aka-claude-tools, and `npm publish --provenance`
     # can only generate a public attestation from a public source repo. This workflow
     # also ships into the private -dev repo via the dev→public sync, so without this
     # guard a `v*` tag pushed in -dev would create a release in the wrong repo with
     # 404 install URLs and a failing provenance publish. The guard makes it a no-op
     # in -dev and correct in public.
-    if: github.repository == 'akasecurity/claude-tools'
+    if: github.repository == 'akasecurity/aka-claude-tools'
     steps:
       - uses: actions/checkout@v7
 
@@ -46,7 +46,7 @@ jobs:
       - name: Preflight — npm CLI supports trusted publishing (OIDC)
         run: |
           # Publishing authenticates with the workflow's OIDC identity (npm trusted publisher
-          # configured on npmjs.com for akasecurity/claude-tools + release.yml); there is no
+          # configured on npmjs.com for akasecurity/aka-claude-tools + release.yml); there is no
           # NPM_TOKEN. OIDC cannot be probed without publishing, so fail early on the one thing
           # we can check: an npm CLI too old to do the token exchange.
           npm --version
@@ -113,12 +113,12 @@ jobs:
 
             **Homebrew** — update [`packaging/homebrew/aka-claude-tools.rb`](packaging/homebrew/aka-claude-tools.rb) in the tap repo:
             ```
-            url "https://github.com/akasecurity/claude-tools/releases/download/${{ github.ref_name }}/aka-claude-tools-${{ steps.ver.outputs.version }}.tar.gz"
+            url "https://github.com/akasecurity/aka-claude-tools/releases/download/${{ github.ref_name }}/aka-claude-tools-${{ steps.ver.outputs.version }}.tar.gz"
             sha256 "${{ steps.tarball.outputs.sha256 }}"
             ```
 
             **Direct download**
             ```bash
             # SHA-256: ${{ steps.tarball.outputs.sha256 }}
-            curl -fsSLO https://github.com/akasecurity/claude-tools/releases/download/${{ github.ref_name }}/aka-claude-tools-${{ steps.ver.outputs.version }}.tar.gz
+            curl -fsSLO https://github.com/akasecurity/aka-claude-tools/releases/download/${{ github.ref_name }}/aka-claude-tools-${{ steps.ver.outputs.version }}.tar.gz
             ```
