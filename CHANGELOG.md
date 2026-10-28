@@ -8,6 +8,8 @@ Pre-1.0: minor versions may carry breaking changes; they are called out below.
 
 ## [Unreleased]
 
+## [0.5.5] command-guard resilience and profile-root hardening
+
 ### Security
 - **The guard hooks no longer take their profile from `CLAUDE_CONFIG_DIR`.** Whether ai-tc is installed (which turns
   off some of the guards' own secret scans) and where the audit log is written were decided from `CLAUDE_CONFIG_DIR`
@@ -15,6 +17,14 @@ Pre-1.0: minor versions may carry breaking changes; they are called out below.
   ai-tc profile switched the scans off. Each hook now derives its profile from its own file location
   (`<profile>/hooks/` or `<profile>/plugins/cache/…/hooks/`); from any other location ai-tc counts as absent and every
   scan runs. The SessionStart integrity check resolves its profile the same way.
+
+### Fixed
+- **command-guard falls back to the conservative checks if it throws.** An unexpected error inside the guard no longer
+  lets the command through unchecked; the built-in conservative checks run instead.
+
+### Changed
+- **command-guard is loaded once by a resident hook client** instead of being started for every command, which cuts the
+  per-command hook latency.
 
 ## [0.5.4] leak-guard covers every SearXNG MCP tool
 
@@ -424,7 +434,8 @@ state before the v0.2.0 public-ready prep.
 Initial internal deployment of the isolated-profile installer, the secure-defaults
 base, and the guard hooks.
 
-[Unreleased]: https://github.com/akasecurity/claude-tools/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/akasecurity/claude-tools/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/akasecurity/claude-tools/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/akasecurity/claude-tools/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/akasecurity/claude-tools/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/akasecurity/claude-tools/compare/v0.5.1...v0.5.2
