@@ -21,4 +21,28 @@ if [ -z "$bun_bin" ]; then
   printf '[aka-claude-tools] guard INACTIVE: bun not found — this tool is NOT being scanned. Install bun (https://bun.sh) to activate the guard.\n' >&2
   exit 0   # FAIL OPEN — never block
 fi
+# The guards read the session's directory from the hook input, never from their own working
+# directory, so start bun from / : bun's start-up slows with a very large working directory.
+cd / 2>/dev/null || :
+# Optional resident hook client for command-guard: it answers the hook itself, keeping the guard
+# loaded between calls, and runs `bun <guard>` when it cannot. It is named only by a line
+#   CT_HOOK_CLIENT=/absolute/path
+# in the aka-claude-tools.config beside this launcher's hooks/ directory (the file the guards read),
+# found from the launcher's own path and never from an environment variable, and is called as
+#   <client> command-guard <bun> <guard>
+# with the hook's stdin; its exit status and output are the hook's. The config and the client must be
+# regular files owned by this user and not writable by group or others; otherwise bun runs the guard.
+_owned() {
+  [ -f "$1" ] && [ -O "$1" ] && [ -z "$(find "$1" -prune \( -perm -g+w -o -perm -o+w \) 2>/dev/null)" ]
+}
+case "$0:${SCRIPT##*/}" in
+  /*:command-guard.ts)
+    _cfg="${0%/*}/../aka-claude-tools.config"
+    if _owned "$_cfg"; then
+      _client="$(sed -n "s/^CT_HOOK_CLIENT=[\"']\{0,1\}\(\/[^\"']*\)[\"']\{0,1\}[[:space:]]*\$/\1/p" "$_cfg" | tail -n 1)"
+      if [ -n "$_client" ] && [ -x "$_client" ] && _owned "$_client"; then
+        exec "$_client" command-guard "$bun_bin" "$SCRIPT"
+      fi
+    fi ;;
+esac
 exec "$bun_bin" "$SCRIPT"

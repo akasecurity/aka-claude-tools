@@ -48,6 +48,8 @@ import { fileURLToPath } from 'url';
 import type { BootstrapRule, OrgTier, RuleId } from './lib/guard-core.js';
 
 const P = '[aka-claude-tools SECURITY] ';
+type HookEnv = Record<string, string | undefined>;
+type Say = (line: string) => void;
 // Used only when guard-core itself cannot load, to find the outbound subset to fail closed on.
 const FALLBACK_OUTBOUND = /\b(curl|wget|nc|ncat|socat|fetch)\b/i;
 // Conservative raw-string structural checks, used only when guard-core cannot load or is
@@ -369,8 +371,7 @@ const NOTICE_MSG: Record<string, (m: string) => string | null> = {
 };
 
 // `undefined` = empty stdin (allow silently); a parsed JSON `null` is passed through.
-function readInput(): HookInput | null | undefined {
-  const raw = readFileSync('/dev/stdin', 'utf-8');
+function readInput(raw: string): HookInput | null | undefined {
   if (!raw.trim()) return undefined;
   return JSON.parse(raw);
 }
@@ -478,54 +479,53 @@ function isPluginInstall(): boolean {
 
 // guard-core missing, unreadable, incompatible or throwing: keep the structural blocks via
 // the raw regexes, fail closed on outbound-looking commands, allow the rest loudly.
-function coreUnavailable(command: string): never {
+function coreUnavailable(command: string, say: Say): never {
   const rule: RuleId | null = PIPE_TO_SHELL_RAW.test(command) ? 'pipe-to-shell'
     : STARTUP_WRITE_RAW.test(command) ? 'startup-write'
     : SEARCH_EXEC_RAW.test(command) ? 'search-exec' : null;
   if (rule) {
-    console.error(P + CORE_MISSING_NOTICE);
-    console.error(P + BLOCK_MSG[rule]());
-    process.exit(2);
+    say(P + CORE_MISSING_NOTICE);
+    say(P + BLOCK_MSG[rule]());
+    exit(2);
   }
   if (FALLBACK_OUTBOUND.test(command)) {
-    console.error(P + '🚨 BLOCKED (command-guard): the guard-core library is missing, unreadable or incompatible, so the egress scan can\'t run — blocking this outbound command as a precaution. Reinstall to restore config/hooks/lib/guard-core.js.');
-    process.exit(2);
+    say(P + '🚨 BLOCKED (command-guard): the guard-core library is missing, unreadable or incompatible, so the egress scan can\'t run — blocking this outbound command as a precaution. Reinstall to restore config/hooks/lib/guard-core.js.');
+    exit(2);
   }
-  console.error(P + CORE_MISSING_NOTICE);
-  process.exit(0);
+  say(P + CORE_MISSING_NOTICE);
+  exit(0);
 }
 
-async function main(): Promise<void> {
+async function main(raw: string, env: HookEnv, say: Say, seen: { command?: string }): Promise<never> {
   let input: HookInput | null | undefined;
-  try { input = readInput(); } catch {
+  try { input = readInput(raw); } catch {
     // Fail open, but loudly — this is the sole Bash guard; surface the miss.
-    console.error(P + '⚠️ command-guard: could not parse hook input — allowed. If this recurs, the hook may be misconfigured.');
-    process.exit(0);
+    say(P + '⚠️ command-guard: could not parse hook input — allowed. If this recurs, the hook may be misconfigured.');
+    exit(0);
   }
-  if (input === undefined) process.exit(0);
+  if (input === undefined) exit(0);
   // Deliberately no null-guard on the parsed value: a JSON `null` body throws here and
   // is surfaced by the top-level catch, as before.
   input = input as HookInput;
-  if (input.tool_name !== 'Bash') process.exit(0);
+  if (input.tool_name !== 'Bash') exit(0);
   const command = typeof input.tool_input === 'string'
     ? input.tool_input : (input.tool_input?.command as string | undefined) ?? '';
-  if (!command) process.exit(0);
+  if (!command) exit(0);
+  seen.command = command;
 
-  try {
-    const bad = misorderedPkill(command);
-    if (bad) {
-      console.error(P + `🚨 BLOCKED (command-guard): on macOS ${bad} stops parsing options at the first pattern, so any option or word after it (-u, a uid, --) is treated as another pattern and can match almost every process. Put options first and give one pattern (join several with |): \`${bad} -u "$(id -u)" -f '<pattern>'\`. Preview matches with \`pgrep -lf\`.`);
-      process.exit(2);
-    }
-  } catch { /* a parser bug must never block or crash the hook */ }
+  let bad: string | null = null;
+  try { bad = misorderedPkill(command); } catch { /* a parser bug must never block or crash the hook */ }
+  if (bad) {
+    say(P + `🚨 BLOCKED (command-guard): on macOS ${bad} stops parsing options at the first pattern, so any option or word after it (-u, a uid, --) is treated as another pattern and can match almost every process. Put options first and give one pattern (join several with |): \`${bad} -u "$(id -u)" -f '<pattern>'\`. Preview matches with \`pgrep -lf\`.`);
+    exit(2);
+  }
 
-  try {
-    const why = tempRmRefusal(command);
-    if (why) {
-      console.error(P + `🚨 BLOCKED (command-guard): ${why}. /tmp, /var/tmp and the per-user temp dir are shared by every session on this host, so a glob there can delete other sessions' working directories. Remove your own entries by their exact names, or by a distinctive prefix of your own (e.g. \`rm -rf /tmp/myrun-*\`).`);
-      process.exit(2);
-    }
-  } catch { /* a parser bug must never block or crash the hook */ }
+  let why: string | null = null;
+  try { why = tempRmRefusal(command); } catch { /* a parser bug must never block or crash the hook */ }
+  if (why) {
+    say(P + `🚨 BLOCKED (command-guard): ${why}. /tmp, /var/tmp and the per-user temp dir are shared by every session on this host, so a glob there can delete other sessions' working directories. Remove your own entries by their exact names, or by a distinctive prefix of your own (e.g. \`rm -rf /tmp/myrun-*\`).`);
+    exit(2);
+  }
 
   type Core = typeof import('./lib/guard-core.js');
   let core: Core;
@@ -535,7 +535,7 @@ async function main(): Promise<void> {
       if (typeof core[fn] !== 'function') throw new Error(`guard-core export ${fn} missing`);
     }
   } catch {
-    coreUnavailable(command);
+    coreUnavailable(command, say);
   }
 
   // ai-tc detection only ever turns scanning off; if it throws, scan (the safe
@@ -554,7 +554,7 @@ async function main(): Promise<void> {
   if (command.includes('|')) {
     const tb = loadTrustedBootstrap();
     trustedBootstrap = tb.rules;
-    if (tb.warn) console.error(P + tb.warn);
+    if (tb.warn) say(P + tb.warn);
   }
 
   // parsePatterns() is called INSIDE this try (not hoisted above it): a throw here must
@@ -581,7 +581,7 @@ async function main(): Promise<void> {
       throw new Error('malformed guard-core decision');
     }
   } catch {
-    coreUnavailable(command);
+    coreUnavailable(command, say);
   }
   // Notices print before the block line, but no notice can abort a block: each is
   // skipped unless it is an object, and a throw while formatting one is swallowed.
@@ -590,14 +590,14 @@ async function main(): Promise<void> {
     try {
       const { code, message } = n as { code?: unknown; message?: unknown };
       const line = typeof code === 'string' ? NOTICE_MSG[code]?.(typeof message === 'string' ? message : '') : null;
-      if (line) console.error(P + line);
+      if (line) say(P + line);
     } catch { /* a malformed notice never changes the decision */ }
   }
 
   // Local security-event audit log (opt-out via ai-tc's presence, see lib/audit.ts).
   // Best effort: loaded lazily so a broken audit.ts can never break the fail-
   // open/fail-closed contract above, and wrapped so it never changes the decision
-  // or exit code. Runs AFTER the decision is final, BEFORE process.exit below.
+  // or exit code. Runs AFTER the decision is final, BEFORE the exit below.
   try {
     const { appendAudit } = await import('./lib/audit.ts');
     const alert = (d.notices as { level?: unknown; code?: unknown; message?: unknown }[])
@@ -628,16 +628,43 @@ async function main(): Promise<void> {
       const msg = BLOCK_MSG[d.rule] as ((detail?: string) => string) | undefined;
       line = msg ? msg(d.detail) : `🚨 BLOCKED (command-guard): ${typeof d.reason === 'string' ? d.reason : 'unrecognised guard-core rule.'}`;
     } catch { /* keep the fixed line; the exit below is what blocks */ }
-    console.error(P + line);
-    process.exit(2);
+    say(P + line);
+    exit(2);
   }
-  process.exit(0);
+  exit(0);
 }
 
-// Top-level guard: deliberate decisions exit inside main() (process.exit 0/2); only an
-// unexpected throw reaches here. Degrade loudly and allow (exit 0) rather than into
-// bun's undefined non-zero exit.
-try { await main(); } catch (e) {
-  console.error(P + '⚠️ command-guard: unexpected error — allowed (surfaced, not silent). ' + String(e));
-  process.exit(0);
+// A decision ends main() by throwing Exit, so the guard can run in-process (run) as well
+// as a hook script: every exit(0|2) above is a decision, never process.exit.
+class Exit { constructor(readonly code: 0 | 2) {} }
+function exit(code: 0 | 2): never { throw new Exit(code); }
+
+/** Evaluates one PreToolUse hook input. `env` stands in for process.env (CLAUDE_CONFIG_DIR is the only key read).
+ * Returns the exit code (0 allow, 2 block) and the stderr text the hook would print. Never throws. */
+export async function run(raw: string, env: HookEnv): Promise<{ code: 0 | 2; stderr: string }> {
+  const lines: string[] = [];
+  const say: Say = (line) => { lines.push(line); };
+  let code: 0 | 2 = 0;
+  const seen: { command?: string } = {};
+  try { await main(raw, env, say, seen); } catch (e) {
+    if (e instanceof Exit) code = e.code;
+    else if (seen.command === undefined) {
+      // An unexpected throw before the command is known: degrade loudly and allow (exit 0).
+      say(P + '⚠️ command-guard: unexpected error — allowed (surfaced, not silent). ' + String(e));
+    } else {
+      // An unexpected throw once the command is known: run the same conservative checks as a
+      // missing guard-core (structural blocks, fail closed on outbound-looking commands).
+      say(P + '⚠️ command-guard: unexpected error — falling back to the conservative checks. ' + String(e));
+      try { coreUnavailable(seen.command, say); } catch (x) { code = x instanceof Exit ? x.code : 2; }
+    }
+  }
+  return { code, stderr: lines.map((l) => l + '\n').join('') };
+}
+
+if (import.meta.main) {
+  let raw = '';
+  try { raw = readFileSync('/dev/stdin', 'utf-8'); } catch { /* unreadable stdin parses as empty: allowed */ }
+  const r = await run(raw, process.env);
+  if (r.stderr) process.stderr.write(r.stderr);
+  process.exit(r.code);
 }
