@@ -23,7 +23,7 @@
     <text x="28" y="138" font-size="17" fill="#CEFCF4">Own settings, hooks, history, auth —</text>
     <text x="28" y="164" font-size="17" fill="#CEFCF4">with the guards on:</text>
     <g font-family="ui-monospace,'Geist Mono',monospace" font-size="14.5" fill="#7DF8E2">
-      <text x="28" y="194">secure-settings ●  leak-guard ●  command-guard ●</text>
+      <text x="28" y="194">secure-settings, leak-guard, command-guard</text>
     </g>
   </g>
 

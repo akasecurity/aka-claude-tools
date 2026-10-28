@@ -4,10 +4,10 @@
   "publishConfig": { "access": "public" },
   "description": "Security defaults for Claude Code — clean context, locked-down credentials, guarded egress.",
   "keywords": ["claude", "claude-code", "security", "ai-safety", "mcp", "hooks"],
-  "homepage": "https://github.com/akasecurity/claude-tools",
+  "homepage": "https://github.com/akasecurity/aka-claude-tools",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/akasecurity/claude-tools.git"
+    "url": "git+https://github.com/akasecurity/aka-claude-tools.git"
   },
   "license": "MIT",
   "bin": {

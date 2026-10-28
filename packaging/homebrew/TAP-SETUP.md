@@ -10,7 +10,7 @@ brew install akasecurity/tap/aka-claude-tools
 ## How the formula is sourced (decoupled from npm)
 
 The formula installs from the **auto-generated git tag tarball**
-(`https://github.com/akasecurity/claude-tools/archive/refs/tags/vX.Y.Z.tar.gz`), which GitHub
+(`https://github.com/akasecurity/aka-claude-tools/archive/refs/tags/vX.Y.Z.tar.gz`), which GitHub
 creates for every tag. This has **no dependency on npm or a published GitHub Release** — Homebrew
 works the moment a tag exists. `aka-claude-tools.rb` in this repo is the source of truth; the tap
 holds a copy.
@@ -22,7 +22,7 @@ After tagging `vX.Y.Z` on the public repo, compute the sha256 of the tag tarball
 
 ```bash
 VER=X.Y.Z
-URL="https://github.com/akasecurity/claude-tools/archive/refs/tags/v${VER}.tar.gz"
+URL="https://github.com/akasecurity/aka-claude-tools/archive/refs/tags/v${VER}.tar.gz"
 curl -sL "$URL" | shasum -a 256   # paste into the formula's sha256
 ```
 
