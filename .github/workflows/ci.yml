@@ -61,14 +61,17 @@ jobs:
           # #444: the maintainer approved exactly one --strict warning, the name "aka-claude-tools"
           # reading as one of Anthropic's own. Allow that one message; every other warning
           # or error still fails. --strict stays on.
+          # Informational "Plugin directory checks" add extra ❯ lines and do not change the result;
+          # count warnings and errors only before that heading (a missing heading still counts all).
           allowed='Plugin name "aka-claude-tools" reads as one of Anthropic'
           rc=0
           out="$(claude plugin validate --strict plugins/claude-tools 2>&1)" || rc=$?
           printf '%s\n' "$out"
           [ "$rc" -eq 0 ] && exit 0
-          msgs="$(printf '%s\n' "$out" | grep -c '^ *❯ ' || true)"
-          errs="$(printf '%s\n' "$out" | grep -Ec 'Found [0-9]+ error' || true)"
-          known="$(printf '%s\n' "$out" | grep '^ *❯ ' | grep -c -F "$allowed" || true)"
+          main="$(printf '%s\n' "$out" | sed '/^Plugin directory checks/,$d')"
+          msgs="$(printf '%s\n' "$main" | grep -c '^ *❯ ' || true)"
+          errs="$(printf '%s\n' "$main" | grep -Ec 'Found [0-9]+ error' || true)"
+          known="$(printf '%s\n' "$main" | grep '^ *❯ ' | grep -c -F "$allowed" || true)"
           if [ "$errs" -eq 0 ] && [ "$msgs" -eq 1 ] && [ "$known" -eq 1 ]; then
             echo "only the approved name warning (#444) fired; passing"
             exit 0

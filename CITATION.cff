@@ -6,7 +6,7 @@ type: software
 authors:
   - family-names: Lin
     given-names: William
-repository-code: "https://github.com/akasecurity/claude-tools"
+repository-code: "https://github.com/akasecurity/aka-claude-tools"
 url: "https://akasecurity.io"
 license: MIT
 version: 0.5.4
