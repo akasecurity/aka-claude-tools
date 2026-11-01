@@ -22,7 +22,7 @@ jobs:
     # in -dev and correct in public.
     if: github.repository == 'akasecurity/aka-claude-tools'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Extract version from tag
         id: ver
@@ -38,7 +38,7 @@ jobs:
           fi
 
       - name: Set up Node.js for npm publish
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: '24'   # trusted publishing needs Node >= 22.14 and npm >= 11.5.1
           registry-url: 'https://registry.npmjs.org'
@@ -98,7 +98,7 @@ jobs:
           echo "sha256=$SHA256"   >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           files: ${{ steps.tarball.outputs.tarball }}
           generate_release_notes: true
