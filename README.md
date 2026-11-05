@@ -7,6 +7,7 @@
   <a href="#quick-start"><b>Install</b></a> &nbsp;·&nbsp;
   <a href="#what-it-guards-against"><b>What it guards against</b></a> &nbsp;·&nbsp;
   <a href="#whats-inside"><b>What's inside</b></a> &nbsp;·&nbsp;
+  <a href="https://akasecurity.github.io/aka-claude-tools-docs/"><b>Docs</b></a> &nbsp;·&nbsp;
   <a href="SECURITY.md"><b>Security</b></a>
 </p>
 
@@ -96,7 +97,7 @@ exists.
 git clone git@github.com:akasecurity/aka-claude-tools.git
 cd aka-claude-tools
 ./install.sh             # interactive
-./install.sh --defaults  # accept the recommended ten
+./install.sh --defaults  # accept the recommended eleven
 ./install.sh --help      # every flag and env var; changes nothing
 ```
 
@@ -110,7 +111,7 @@ not a bare sandbox. Prefer a walkthrough? See the [safe-setup carousel](media/de
 
 ### Install as a Claude Code plugin (guards into your active profile)
 
-`claude plugin marketplace add akasecurity/marketplace` then `claude plugin install aka-claude-tools@akasecurity` installs the guard hooks (command-guard, leak-guard, mcp-guard) into your **active** profile.
+`claude plugin marketplace add akasecurity/marketplace` then `claude plugin install aka-claude-tools@akasecurity` installs the guard hooks (command-guard, leak-guard, mcp-guard, post-guard) into your **active** profile.
 
 - **Requires `bun`.** The guards run under bun. They **fail open** — if bun is missing they never
   block your work; instead you get one clear "guards INACTIVE" notice at session start. Install bun
